@@ -156,38 +156,59 @@ async function getUrlsFromSitemap(sitemapUrl) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.post('/upload', async (req, res) => {
+app.post('/upload', upload.single('csv'), async (req, res) => {
   try {
-    const { url, all_pages } = req.body;
-
-    if (!url || !all_pages) {
-      return res.status(400).send('URL and all_pages fields are required.');
-    }
-
-    if (all_pages === 'yes') {
-      const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
-      const pageTexts = await Promise.all(pages.map(async (page) => {
-        const text = await getPageText(page);
-        return convert(text, options);
-      }));
-      const content = await generateText(pageTexts.join('\n'));
-      createAndMoveDocument(content, url);
-      console.log(`${url} - all pages`);
-    } else if (all_pages === 'no') {
-      console.log(url);
-      const content = await scrapeLocal(url);
-      console.log(content);
+    if (req.file) {
+      // CSV file upload case
+      const filePath = req.file.path;
+      fs.createReadStream(filePath)
+        .pipe(csv())
+        .on('data', async (row) => {
+          await processRow(row);
+        })
+        .on('end', () => {
+          console.log('CSV file processing done.');
+          res.send('CSV file processing done.');
+        });
     } else {
-      console.log(`Invalid value for "all_pages" for URL: ${url}`);
-    }
+      // Direct request with 'url' and 'all_pages' fields
+      const { url, all_pages } = req.body;
 
-    console.log('CSV request processed successfully.');
-    res.send('CSV request processed successfully.');
+      if (!url || !all_pages) {
+        return res.status(400).send('URL and all_pages fields are required.');
+      }
+
+      await processRow({ url, all_pages });
+
+      console.log('Direct request processed successfully.');
+      res.send('Direct request processed successfully.');
+    }
   } catch (error) {
-    console.error('Error processing CSV:', error);
+    console.error('Error processing request:', error);
     res.status(500).send('Internal Server Error');
   }
 });
+
+async function processRow(row) {
+  const { url, all_pages } = row;
+
+  if (all_pages === 'yes') {
+    const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
+    const pageTexts = await Promise.all(pages.map(async (page) => {
+      const text = await getPageText(page);
+      return convert(text, options);
+    }));
+    const content = await generateText(pageTexts.join('\n'));
+    createAndMoveDocument(content, url);
+    console.log(`${url} - all pages`);
+  } else if (all_pages === 'no') {
+    console.log(url);
+    const content = await scrapeLocal(url);
+    console.log(content);
+  } else {
+    console.log(`Invalid value for "all_pages" for URL: ${url}`);
+  }
+}
 
 async function getPageText(url) {
   try {
