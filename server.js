@@ -21,7 +21,7 @@ const upload = multer({ dest: 'uploads/' });
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-
+ 
 const prompt = process.env.PROMPT_TEXT;
 
 const credentials = {
@@ -156,42 +156,38 @@ async function getUrlsFromSitemap(sitemapUrl) {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.post('/upload', upload.single('csv'), async (req, res) => {
+app.post('/upload', async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).send('No file uploaded.');
+    const { url, all_pages } = req.body;
+
+    if (!url || !all_pages) {
+      return res.status(400).send('URL and all_pages fields are required.');
     }
-    const filePath = req.file.path;
-    fs.createReadStream(filePath)
-      .pipe(csv())
-      .on('data', async (row) => {
-        const { url, all_pages } = row;
-        if (all_pages === 'yes') {
-          const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
-          const pageTexts = await Promise.all(pages.map(async (page) => {
-            const text = await getPageText(page);
-            return convert(text, options);
-          }));
-          const content = await generateText(pageTexts.join('\n'));
-          createAndMoveDocument(content, url);
-          console.log(`${url} - all pages`);
-        } else if (all_pages === 'no') {
-          console.log(url);
-          const content = await scrapeLocal(url);
-          console.log(content);
-        } else {
-          console.log(`Invalid value for "all_pages" for URL: ${url}`);
-        }
-      })
-      .on('end', () => {
-        console.log('CSV file processing done.');
-        res.send('CSV file processing done.');
-      });
-    } catch (error) {
-      console.error('Error processing CSV:', error);
-      res.status(500).send('Internal Server Error');
+
+    if (all_pages === 'yes') {
+      const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
+      const pageTexts = await Promise.all(pages.map(async (page) => {
+        const text = await getPageText(page);
+        return convert(text, options);
+      }));
+      const content = await generateText(pageTexts.join('\n'));
+      createAndMoveDocument(content, url);
+      console.log(`${url} - all pages`);
+    } else if (all_pages === 'no') {
+      console.log(url);
+      const content = await scrapeLocal(url);
+      console.log(content);
+    } else {
+      console.log(`Invalid value for "all_pages" for URL: ${url}`);
     }
-  });
+
+    console.log('CSV request processed successfully.');
+    res.send('CSV request processed successfully.');
+  } catch (error) {
+    console.error('Error processing CSV:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
 
 async function getPageText(url) {
   try {
