@@ -108,7 +108,7 @@ async function generateText(text) {
     console.log(prompt + text)
     const chatCompletion = await openai.chat.completions.create({
       messages: [{ role: "user", content: prompt + text }],
-      model: "gpt-3.5-turbo"
+      model: process.env.GPT_MODEL
     });
     console.log(chatCompletion.choices[0].message.content);
     return chatCompletion.choices[0].message.content;
