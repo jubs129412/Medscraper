@@ -39,7 +39,7 @@ const credentials = {
 }
 
 async function getAllPages(pageUrl) {
-
+console.log(pageUrl)
   try {
     const response = await axios.get(pageUrl);
     const $ = cheerio.load(response.data);
