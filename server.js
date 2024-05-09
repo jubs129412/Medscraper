@@ -51,6 +51,7 @@ console.log(pageUrl)
     $('a').each((_, element) => {
       const href = $(element).attr('href');
       if (href && href.startsWith(baseDomain)) {
+        console.log(href)
         foundUrls.add(href);
       }
     });
