@@ -38,46 +38,35 @@ const credentials = {
   "universe_domain": "googleapis.com"
 }
 
-async function getAllPages(pageUrl) {
-console.log(pageUrl)
+async function getAllPages(url) {
   try {
-    const response = await axios.get(pageUrl);
-    console.log("finished!")
-    const $ = cheerio.load(response.data);
-    const parsedUrl = url.parse(pageUrl);
-    const baseDomain = `${parsedUrl.protocol}//${parsedUrl.hostname}`;
-    const foundUrls = new Set();
+      const response = await axios.get(url);
+      const $ = cheerio.load(response.data);
+      const links = $('a');
 
-    $('a').each((_, element) => {
-      const href = $(element).attr('href');
-      if (href && href.startsWith(baseDomain)) {
-        console.log(href)
-        foundUrls.add(href);
-      }
-    });
+      const pages = new Set();
+      const baseUrl = new URL(url);
 
-    return Array.from(foundUrls);
+      links.each((index, element) => {
+          const href = $(element).attr('href');
+          if (href && href.startsWith('http')) {
+              try {
+                  const absoluteUrl = new URL(href);
+                  if (absoluteUrl.hostname === baseUrl.hostname) {
+                      pages.add(absoluteUrl.href);
+                  }
+              } catch (error) {
+                  console.error('Invalid URL:', href);
+              }
+          }
+      });
+
+      return Array.from(pages);
   } catch (error) {
-    console.error('Error:', error);
-    return [];
-  }
-
-}
-
-// Function to check if a URL is valid
-function isValidURL(url) {
-  try {
-    new URL(url);
-    return true;
-  } catch (error) {
-    return false;
+      console.error('Error retrieving pages:', error);
+      return [];
   }
 }
-
-// Example usage:
-getAllPages('https://example.com')
-  .then(pages => console.log(pages))
-  .catch(error => console.error(error));
 
 function getBaseUrl(websiteUrl) {
   const parsedUrl = new URL(websiteUrl);
@@ -145,12 +134,12 @@ async function generateText(text) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    //console.log(prompt + text)
+    console.log(prompt + text)
     const chatCompletion = await openai.chat.completions.create({
       messages: [{ role: "user", content: prompt + text }],
       model: process.env.GPT_MODEL
     });
-    //console.log(chatCompletion.choices[0].message.content);
+    console.log(chatCompletion.choices[0].message.content);
     return chatCompletion.choices[0].message.content;
   } catch (error) {
     console.log(error);
@@ -166,7 +155,7 @@ async function scrapeLocal(url) {
     const text = $('body').text();
     const cleanedText = text.replace(/\s+/g, ' ').trim();
     const content = await generateText(cleanedText);
-    //console.log(content);
+    console.log(content);
     createAndMoveDocument(content, url);
     return content;
   } catch (error) {
@@ -179,8 +168,10 @@ async function getUrlsFromSitemap(sitemapUrl) {
     const response = await axios.get(sitemapUrl);
     const $ = cheerio.load(response.data, { xmlMode: true });
     const urls = [];
+    const maxUrls = 10;
     
     $('url loc').each((index, element) => {
+      if (index >= maxUrls) return false; 
       const url = $(element).text();
       console.log(url);
       urls.push(url);
@@ -233,8 +224,7 @@ async function processRow(row) {
   const { url, all_pages } = row;
 
   if (all_pages === 'yes') {
-    console.log(`this is all pages ${url}`)
-    const pages = await getAllPages(url);
+    const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
     const pageTexts = await Promise.all(pages.map(async (page) => {
       const text = await getPageText(page);
       return convert(text, options);
@@ -245,7 +235,7 @@ async function processRow(row) {
   } else if (all_pages === 'no') {
     console.log(url);
     const content = await scrapeLocal(url);
-    //console.log(content);
+    console.log(content);
   } else {
     console.log(`Invalid value for "all_pages" for URL: ${url}`);
   }
@@ -253,7 +243,6 @@ async function processRow(row) {
 
 async function getPageText(url) {
   try {
-    console.log(`this is not all pages ${url}`)
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
     $('script').remove();
