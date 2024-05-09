@@ -40,6 +40,11 @@ const credentials = {
 
 async function getAllPages(url) {
   try {
+    // Check if the URL is valid
+    if (!isValidURL(url)) {
+      throw new Error('Invalid URL');
+    }
+
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
     const links = $('a');
@@ -50,8 +55,7 @@ async function getAllPages(url) {
     $('a').each((index, element) => {
       const href = $(element).attr('href'); // Get the href attribute
       if (href) {
-        const absoluteUrl = new URL(href, baseUrl).href;
-        console.log(absoluteUrl) // Resolve relative URLs
+        const absoluteUrl = new URL(href, baseUrl).href; // Resolve relative URLs
         urls.add(absoluteUrl); // Add the absolute URL to the set
       }
     });
@@ -62,6 +66,21 @@ async function getAllPages(url) {
     return [];
   }
 }
+
+// Function to check if a URL is valid
+function isValidURL(url) {
+  try {
+    new URL(url);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Example usage:
+getAllPages('https://example.com')
+  .then(pages => console.log(pages))
+  .catch(error => console.error(error));
 
 function getBaseUrl(websiteUrl) {
   const parsedUrl = new URL(websiteUrl);
