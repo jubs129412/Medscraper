@@ -231,6 +231,7 @@ async function processRow(row) {
   const { url, all_pages } = row;
 
   if (all_pages === 'yes') {
+    console.log(`this is all pages ${url}`)
     const pages = await getAllPages(url);
     const pageTexts = await Promise.all(pages.map(async (page) => {
       const text = await getPageText(page);
