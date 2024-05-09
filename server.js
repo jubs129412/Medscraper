@@ -38,6 +38,35 @@ const credentials = {
   "universe_domain": "googleapis.com"
 }
 
+async function getAllPages(url) {
+  try {
+      const response = await axios.get(url);
+      const $ = cheerio.load(response.data);
+      const links = $('a');
+
+      const pages = new Set();
+      const baseUrl = new URL(url);
+
+      links.each((index, element) => {
+          const href = $(element).attr('href');
+          if (href && href.startsWith('http')) {
+              try {
+                  const absoluteUrl = new URL(href);
+                  if (absoluteUrl.hostname === baseUrl.hostname) {
+                      pages.add(absoluteUrl.href);
+                  }
+              } catch (error) {
+                  console.error('Invalid URL:', href);
+              }
+          }
+      });
+
+      return Array.from(pages);
+  } catch (error) {
+      console.error('Error retrieving pages:', error);
+      return [];
+  }
+}
 
 function getBaseUrl(websiteUrl) {
   const parsedUrl = new URL(websiteUrl);
@@ -193,7 +222,7 @@ async function processRow(row) {
   const { url, all_pages } = row;
 
   if (all_pages === 'yes') {
-    const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
+    const pages = await getAllPages(`${getBaseUrl(url)}`);
     const pageTexts = await Promise.all(pages.map(async (page) => {
       const text = await getPageText(page);
       return convert(text, options);
