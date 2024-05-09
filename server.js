@@ -251,6 +251,7 @@ async function processRow(row) {
 
 async function getPageText(url) {
   try {
+    console.log(`this is not all pages ${url}`)
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
     $('script').remove();
