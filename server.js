@@ -40,31 +40,26 @@ const credentials = {
 
 async function getAllPages(url) {
   try {
-      const response = await axios.get(url);
-      const $ = cheerio.load(response.data);
-      const links = $('a');
+    const response = await axios.get(url);
+    const $ = cheerio.load(response.data);
+    const links = $('a');
 
-      const pages = new Set();
-      const baseUrl = new URL(url);
+    const urls = new Set(); // Changed from 'pages' to 'urls'
+    const baseUrl = new URL(url);
 
-      links.each((index, element) => {
-          const href = $(element).attr('href');
-          if (href && href.startsWith('http')) {
-              try {
-                  const absoluteUrl = new URL(href);
-                  if (absoluteUrl.hostname === baseUrl.hostname) {
-                      pages.add(absoluteUrl.href);
-                  }
-              } catch (error) {
-                  console.error('Invalid URL:', href);
-              }
-          }
-      });
+    $('a').each((index, element) => {
+      const href = $(element).attr('href'); // Get the href attribute
+      if (href) {
+        const absoluteUrl = new URL(href, baseUrl).href;
+        console.log(absoluteUrl) // Resolve relative URLs
+        urls.add(absoluteUrl); // Add the absolute URL to the set
+      }
+    });
 
-      return Array.from(pages);
+    return Array.from(urls); // Convert set to array and return
   } catch (error) {
-      console.error('Error retrieving pages:', error);
-      return [];
+    console.error('Error retrieving pages:', error);
+    return [];
   }
 }
 
@@ -134,12 +129,12 @@ async function generateText(text) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    console.log(prompt + text)
+    //console.log(prompt + text)
     const chatCompletion = await openai.chat.completions.create({
       messages: [{ role: "user", content: prompt + text }],
       model: process.env.GPT_MODEL
     });
-    console.log(chatCompletion.choices[0].message.content);
+    //console.log(chatCompletion.choices[0].message.content);
     return chatCompletion.choices[0].message.content;
   } catch (error) {
     console.log(error);
@@ -155,7 +150,7 @@ async function scrapeLocal(url) {
     const text = $('body').text();
     const cleanedText = text.replace(/\s+/g, ' ').trim();
     const content = await generateText(cleanedText);
-    console.log(content);
+    //console.log(content);
     createAndMoveDocument(content, url);
     return content;
   } catch (error) {
@@ -233,7 +228,7 @@ async function processRow(row) {
   } else if (all_pages === 'no') {
     console.log(url);
     const content = await scrapeLocal(url);
-    console.log(content);
+    //console.log(content);
   } else {
     console.log(`Invalid value for "all_pages" for URL: ${url}`);
   }
