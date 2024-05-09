@@ -42,6 +42,7 @@ async function getAllPages(pageUrl) {
 console.log(pageUrl)
   try {
     const response = await axios.get(pageUrl);
+    console.log("finished!")
     const $ = cheerio.load(response.data);
     const parsedUrl = url.parse(pageUrl);
     const baseDomain = `${parsedUrl.protocol}//${parsedUrl.hostname}`;
