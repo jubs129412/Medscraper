@@ -38,33 +38,28 @@ const credentials = {
   "universe_domain": "googleapis.com"
 }
 
-async function getAllPages(url) {
+async function getAllPages(pageUrl) {
+
   try {
-    // Check if the URL is valid
-    if (!isValidURL(url)) {
-      throw new Error('Invalid URL');
-    }
-
-    const response = await axios.get(url);
+    const response = await axios.get(pageUrl);
     const $ = cheerio.load(response.data);
-    const links = $('a');
+    const parsedUrl = url.parse(pageUrl);
+    const baseDomain = `${parsedUrl.protocol}//${parsedUrl.hostname}`;
+    const foundUrls = new Set();
 
-    const urls = new Set(); // Changed from 'pages' to 'urls'
-    const baseUrl = new URL(url);
-
-    $('a').each((index, element) => {
-      const href = $(element).attr('href'); // Get the href attribute
-      if (href) {
-        const absoluteUrl = new URL(href, baseUrl).href; // Resolve relative URLs
-        urls.add(absoluteUrl); // Add the absolute URL to the set
+    $('a').each((_, element) => {
+      const href = $(element).attr('href');
+      if (href && href.startsWith(baseDomain)) {
+        foundUrls.add(href);
       }
     });
 
-    return Array.from(urls); // Convert set to array and return
+    return Array.from(foundUrls);
   } catch (error) {
-    console.error('Error retrieving pages:', error);
+    console.error('Error:', error);
     return [];
   }
+
 }
 
 // Function to check if a URL is valid
@@ -236,7 +231,7 @@ async function processRow(row) {
   const { url, all_pages } = row;
 
   if (all_pages === 'yes') {
-    const pages = await getAllPages(`${getBaseUrl(url)}`);
+    const pages = await getAllPages(url);
     const pageTexts = await Promise.all(pages.map(async (page) => {
       const text = await getPageText(page);
       return convert(text, options);
