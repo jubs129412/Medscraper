@@ -167,16 +167,37 @@ async function getUrlsFromSitemap(sitemapUrl) {
   try {
     const response = await axios.get(sitemapUrl);
     const $ = cheerio.load(response.data, { xmlMode: true });
+
+    // Check if the response is an index of sitemaps
+    const sitemapIndex = $('sitemapindex');
+    if (sitemapIndex.length > 0) {
+      // If it's an index of sitemaps, extract individual sitemap URLs and retrieve their contents
+      const sitemapUrls = [];
+      sitemapIndex.find('sitemap loc').each((index, element) => {
+        const sitemapUrl = $(element).text();
+        sitemapUrls.push(sitemapUrl);
+      });
+
+      // Fetch URLs from individual sitemaps recursively
+      const urls = [];
+      for (const url of sitemapUrls) {
+        const subUrls = await getUrlsFromSitemap(url);
+        urls.push(...subUrls);
+      }
+
+      return urls;
+    }
+
+    // If it's a direct sitemap, extract URLs
     const urls = [];
     const maxUrls = 10;
-    
     $('url loc').each((index, element) => {
-      if (index >= maxUrls) return false; 
+      if (index >= maxUrls) return false;
       const url = $(element).text();
       console.log(url);
       urls.push(url);
     });
-    
+
     return urls;
   } catch (error) {
     console.error('Error fetching sitemap:', error);
