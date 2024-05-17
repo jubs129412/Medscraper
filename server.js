@@ -6,13 +6,12 @@ const cors = require('cors');
 const axios = require('axios');
 const cheerio = require('cheerio');
 const multer = require('multer');
-const url = require('url');
-const { OpenAI } = require("openai");
-require('dotenv').config();
+const { OpenAI } = require('openai');
 const { convert } = require('html-to-text');
-const options = {
-  wordwrap: 130,
-};
+const { Parser } = require('json2csv');
+require('dotenv').config();
+
+const options = { wordwrap: 130 };
 
 const app = express();
 const port = 3000;
@@ -21,50 +20,50 @@ const upload = multer({ dest: 'uploads/' });
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
- 
+
 const prompt = process.env.PROMPT_TEXT;
 
 const credentials = {
-  "type": "service_account",
-  "project_id": process.env.project_id,
-  "private_key_id": process.env.private_key_id,
-  "private_key": process.env.private_key,
-  "client_email": process.env.client_email,
-  "client_id": process.env.client_id,
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": process.env.client_x509_cert_url,
-  "universe_domain": "googleapis.com"
-}
+  type: 'service_account',
+  project_id: process.env.project_id,
+  private_key_id: process.env.private_key_id,
+  private_key: process.env.private_key.replace(/\\n/g, '\n'),
+  client_email: process.env.client_email,
+  client_id: process.env.client_id,
+  auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+  token_uri: 'https://oauth2.googleapis.com/token',
+  auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+  client_x509_cert_url: process.env.client_x509_cert_url,
+  universe_domain: 'googleapis.com',
+};
 
 async function getAllPages(url) {
   try {
-      const response = await axios.get(url);
-      const $ = cheerio.load(response.data);
-      const links = $('a');
+    const response = await axios.get(url);
+    const $ = cheerio.load(response.data);
+    const links = $('a');
 
-      const pages = new Set();
-      const baseUrl = new URL(url);
+    const pages = new Set();
+    const baseUrl = new URL(url);
 
-      links.each((index, element) => {
-          const href = $(element).attr('href');
-          if (href && href.startsWith('http')) {
-              try {
-                  const absoluteUrl = new URL(href);
-                  if (absoluteUrl.hostname === baseUrl.hostname) {
-                      pages.add(absoluteUrl.href);
-                  }
-              } catch (error) {
-                  console.error('Invalid URL:', href);
-              }
+    links.each((index, element) => {
+      const href = $(element).attr('href');
+      if (href && href.startsWith('http')) {
+        try {
+          const absoluteUrl = new URL(href);
+          if (absoluteUrl.hostname === baseUrl.hostname) {
+            pages.add(absoluteUrl.href);
           }
-      });
+        } catch (error) {
+          console.error('Invalid URL:', href);
+        }
+      }
+    });
 
-      return Array.from(pages);
+    return Array.from(pages);
   } catch (error) {
-      console.error('Error retrieving pages:', error);
-      return [];
+    console.error('Error retrieving pages:', error);
+    return [];
   }
 }
 
@@ -79,8 +78,8 @@ async function createAndMoveDocument(content, url) {
       credentials: credentials,
       scopes: [
         'https://www.googleapis.com/auth/documents',
-        'https://www.googleapis.com/auth/drive'
-      ]
+        'https://www.googleapis.com/auth/drive',
+      ],
     });
 
     const authClient = await auth.getClient();
@@ -90,8 +89,8 @@ async function createAndMoveDocument(content, url) {
 
     const docCreationResponse = await docs.documents.create({
       requestBody: {
-        title: url
-      }
+        title: url,
+      },
     });
 
     const documentId = docCreationResponse.data.documentId;
@@ -104,16 +103,16 @@ async function createAndMoveDocument(content, url) {
           {
             insertText: {
               location: {
-                index: 1
+                index: 1,
               },
-              text: content
-            }
-          }
-        ]
-      }
+              text: content,
+            },
+          },
+        ],
+      },
     });
 
-    console.log("Text updated in document.");
+    console.log('Text updated in document.');
 
     const folderId = process.env.G_DRIVE_FOLDER;
 
@@ -121,12 +120,14 @@ async function createAndMoveDocument(content, url) {
       fileId: documentId,
       addParents: folderId,
       removeParents: 'root',
-      fields: 'id, parents'
+      fields: 'id, parents',
     });
 
     console.log(`Document moved to folder with ID: ${folderId}`);
+    return `https://docs.google.com/document/d/${documentId}`;
   } catch (error) {
     console.error('Error:', error.message);
+    return null;
   }
 }
 
@@ -134,15 +135,16 @@ async function generateText(text) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    console.log(prompt + text)
+    console.log(prompt + text);
     const chatCompletion = await openai.chat.completions.create({
-      messages: [{ role: "user", content: prompt + text }],
-      model: process.env.GPT_MODEL
+      messages: [{ role: 'user', content: prompt + text }],
+      model: process.env.GPT_MODEL,
     });
     console.log(chatCompletion.choices[0].message.content);
     return chatCompletion.choices[0].message.content;
   } catch (error) {
     console.log(error);
+    return '';
   }
 }
 
@@ -156,10 +158,11 @@ async function scrapeLocal(url) {
     const cleanedText = text.replace(/\s+/g, ' ').trim();
     const content = await generateText(cleanedText);
     console.log(content);
-    createAndMoveDocument(content, url);
-    return content;
+    const docLink = await createAndMoveDocument(content, url);
+    return { content, docLink };
   } catch (error) {
     console.log(error);
+    return { content: '', docLink: null };
   }
 }
 
@@ -210,17 +213,18 @@ app.use(express.urlencoded({ extended: true }));
 
 app.post('/upload', upload.single('csv'), async (req, res) => {
   try {
+    const results = [];
     if (req.file) {
       // CSV file upload case
       const filePath = req.file.path;
       fs.createReadStream(filePath)
         .pipe(csv())
         .on('data', async (row) => {
-          await processRow(row);
+          results.push(row);
         })
-        .on('end', () => {
-          console.log('CSV file processing done.');
-          res.send('CSV file processing done.');
+        .on('end', async () => {
+          const processedResults = await processRows(results);
+          sendCsvResponse(res, processedResults);
         });
     } else {
       // Direct request with 'url' and 'all_pages' fields
@@ -230,10 +234,8 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
         return res.status(400).send('URL and all_pages fields are required.');
       }
 
-      await processRow({ url, all_pages });
-
-      console.log('Direct request processed successfully.');
-      res.send('Direct request processed successfully.');
+      const processedResults = await processRows([{ url, all_pages }]);
+      sendCsvResponse(res, processedResults);
     }
   } catch (error) {
     console.error('Error processing request:', error);
@@ -241,25 +243,33 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
   }
 });
 
-async function processRow(row) {
-  const { url, all_pages } = row;
+async function processRows(rows) {
+  const results = [];
 
-  if (all_pages === 'yes') {
-    const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
-    const pageTexts = await Promise.all(pages.map(async (page) => {
-      const text = await getPageText(page);
-      return convert(text, options);
-    }));
-    const content = await generateText(pageTexts.join('\n'));
-    createAndMoveDocument(content, url);
-    console.log(`${url} - all pages`);
-  } else if (all_pages === 'no') {
-    console.log(url);
-    const content = await scrapeLocal(url);
-    console.log(content);
-  } else {
-    console.log(`Invalid value for "all_pages" for URL: ${url}`);
+  for (const row of rows) {
+    const { url, all_pages } = row;
+
+    if (all_pages === 'yes') {
+      const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
+      const pageTexts = await Promise.all(pages.map(async (page) => {
+        const text = await getPageText(page);
+        return convert(text, options);
+      }));
+      const content = await generateText(pageTexts.join('\n'));
+      const docLink = await createAndMoveDocument(content, url);
+      results.push({ ...row, doc_link: docLink });
+      console.log(`${url} - all pages`);
+    } else if (all_pages === 'no') {
+      console.log(url);
+      const { content, docLink } = await scrapeLocal(url);
+      console.log(content);
+      results.push({ ...row, doc_link: docLink });
+    } else {
+      console.log(`Invalid value for "all_pages" for URL: ${url}`);
+    }
   }
+
+  return results;
 }
 
 async function getPageText(url) {
@@ -275,4 +285,14 @@ async function getPageText(url) {
     console.error('Error retrieving page text:', error);
     return '';
   }
+}
+
+function sendCsvResponse(res, data) {
+  const fields = Object.keys(data[0]);
+  const parser = new Parser({ fields });
+  const csv = parser.parse(data);
+
+  res.header('Content-Type', 'text/csv');
+  res.attachment('output.csv');
+  res.send(csv);
 }
