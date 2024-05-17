@@ -239,7 +239,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
     }
   } catch (error) {
     console.error('Error processing request:', error);
-    res.status(500).send('Internal Server Error');
+    //res.status(500).send('Internal Server Error');
   }
 });
 
@@ -249,7 +249,7 @@ async function processRows(rows) {
   for (const row of rows) {
     const { url, all_pages } = row;
 
-    if (all_pages === 'yes') {
+    if (all_pages.toLowerCase() === 'yes') {
       const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
       const pageTexts = await Promise.all(pages.map(async (page) => {
         const text = await getPageText(page);
@@ -259,7 +259,7 @@ async function processRows(rows) {
       const docLink = await createAndMoveDocument(content, url);
       results.push({ ...row, doc_link: docLink });
       console.log(`${url} - all pages`);
-    } else if (all_pages === 'no') {
+    } else if (all_pages.toLowerCase() === 'no') {
       console.log(url);
       const { content, docLink } = await scrapeLocal(url);
       console.log(content);
