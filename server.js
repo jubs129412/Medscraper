@@ -72,7 +72,7 @@ function getBaseUrl(websiteUrl) {
   return `${parsedUrl.protocol}//${parsedUrl.hostname}`;
 }
 
-async function createAndMoveDocument(content, url) {
+async function createAndMoveDocument(content, url, parentFolderId) {
   try {
     const auth = new google.auth.GoogleAuth({
       credentials: credentials,
@@ -87,15 +87,31 @@ async function createAndMoveDocument(content, url) {
     const docs = google.docs({ version: 'v1', auth: authClient });
     const drive = google.drive({ version: 'v3', auth: authClient });
 
+    // Create a folder within the current folder
+    const folderMetadata = {
+      'name': 'Processed Documents',
+      'parents': [parentFolderId],
+      'mimeType': 'application/vnd.google-apps.folder'
+    };
+
+    const folder = await drive.files.create({
+      resource: folderMetadata,
+      fields: 'id'
+    });
+
+    const folderId = folder.data.id;
+
+    // Create the document
     const docCreationResponse = await docs.documents.create({
       requestBody: {
-        title: url,
-      },
+        title: url
+      }
     });
 
     const documentId = docCreationResponse.data.documentId;
     console.log(`Created document with ID: ${documentId}`);
 
+    // Update the document content
     await docs.documents.batchUpdate({
       documentId: documentId,
       requestBody: {
@@ -103,24 +119,23 @@ async function createAndMoveDocument(content, url) {
           {
             insertText: {
               location: {
-                index: 1,
+                index: 1
               },
-              text: content,
-            },
-          },
-        ],
-      },
+              text: content
+            }
+          }
+        ]
+      }
     });
 
-    console.log('Text updated in document.');
+    console.log("Text updated in document.");
 
-    const folderId = process.env.G_DRIVE_FOLDER;
-
-    await drive.files.update({
+    // Move the document to the created folder
+    const fileMoveResponse = await drive.files.update({
       fileId: documentId,
       addParents: folderId,
       removeParents: 'root',
-      fields: 'id, parents',
+      fields: 'id, parents'
     });
 
     console.log(`Document moved to folder with ID: ${folderId}`);
