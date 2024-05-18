@@ -72,6 +72,36 @@ function getBaseUrl(websiteUrl) {
   return `${parsedUrl.protocol}//${parsedUrl.hostname}`;
 }
 
+async function createNewFolder(parentFolderId, folderName) {
+  try {
+    const auth = new google.auth.GoogleAuth({
+      credentials: credentials,
+      scopes: ['https://www.googleapis.com/auth/drive'],
+    });
+
+    const authClient = await auth.getClient();
+    const drive = google.drive({ version: 'v3', auth: authClient });
+
+    const fileMetadata = {
+      name: folderName,
+      mimeType: 'application/vnd.google-apps.folder',
+      parents: [parentFolderId],
+    };
+
+    const folder = await drive.files.create({
+      resource: fileMetadata,
+      fields: 'id',
+    });
+
+    console.log(`Folder created with ID: ${folder.data.id}`);
+    return folder.data.id;
+  } catch (error) {
+    console.error('Error creating folder:', error);
+    return null;
+  }
+}
+
+
 async function makeFolderPublic(folderId) {
   try {
     const auth = new google.auth.GoogleAuth({
