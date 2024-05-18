@@ -14,6 +14,7 @@ const { convert } = require('html-to-text');
 const { Parser } = require('json2csv');
 const pLimit = require('p-limit');
 require('dotenv').config();
+const MAX_RECURSION_DEPTH = 5;
 
 const options = { wordwrap: 130 };
 
