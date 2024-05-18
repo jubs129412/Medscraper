@@ -82,7 +82,7 @@ function getBaseUrl(websiteUrl) {
   }
 }
 
-async function retryWithBackoff(fn, retries = 5, delay = 1000) {
+async function retryWithBackoff(fn, retries = 5, delay = 10000) {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
