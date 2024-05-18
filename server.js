@@ -69,8 +69,13 @@ async function getAllPages(url) {
 }
 
 function getBaseUrl(websiteUrl) {
-  const parsedUrl = new URL(websiteUrl);
-  return `${parsedUrl.protocol}//${parsedUrl.hostname}`;
+  try {
+    const parsedUrl = new URL(websiteUrl);
+    return `${parsedUrl.protocol}//${parsedUrl.hostname}`;
+  } catch (error) {
+    console.error('Invalid URL:', websiteUrl, error);
+    return null;
+  }
 }
 
 async function createNewFolder(parentFolderId, folderName) {
@@ -218,30 +223,26 @@ async function scrapeLocal(url, parentFolderId) {
 
 async function getUrlsFromSitemap(sitemapUrl) {
   try {
-    const response = await axios.get(sitemapUrl);
+    sitemapUrl = sitemapUrl.replace(/^http:\/\//i, 'https://');
+    let response = await axios.get(sitemapUrl);
     const $ = cheerio.load(response.data, { xmlMode: true });
-
-    // Check if the response is an index of sitemaps
+    
     const sitemapIndex = $('sitemapindex');
     if (sitemapIndex.length > 0) {
-      // If it's an index of sitemaps, extract individual sitemap URLs and retrieve their contents
       const sitemapUrls = [];
       sitemapIndex.find('sitemap loc').each((index, element) => {
         const sitemapUrl = $(element).text();
         sitemapUrls.push(sitemapUrl);
       });
 
-      // Fetch URLs from individual sitemaps recursively
       const urls = [];
       for (const url of sitemapUrls) {
         const subUrls = await getUrlsFromSitemap(url);
         urls.push(...subUrls);
       }
-
       return urls;
     }
 
-    // If it's a direct sitemap, extract URLs
     const urls = [];
     const maxUrls = 10; // Adjust this value as needed
     $('url loc').each((index, element) => {
@@ -253,6 +254,26 @@ async function getUrlsFromSitemap(sitemapUrl) {
     return urls;
   } catch (error) {
     console.error('Error fetching sitemap:', error);
+    if (sitemapUrl.includes('www.')) {
+      try {
+        sitemapUrl = sitemapUrl.replace('www.', '');
+        const response = await axios.get(sitemapUrl);
+        const $ = cheerio.load(response.data, { xmlMode: true });
+
+        const urls = [];
+        const maxUrls = 10; // Adjust this value as needed
+        $('url loc').each((index, element) => {
+          if (index >= maxUrls) return false;
+          const url = $(element).text();
+          urls.push(url);
+        });
+
+        return urls;
+      } catch (error) {
+        console.error('Error fetching sitemap without www:', error);
+        return [];
+      }
+    }
     return [];
   }
 }
@@ -264,9 +285,8 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
   try {
     const results = [];
     if (req.file) {
-      // CSV file upload case
       const filePath = req.file.path;
-      const fileName = req.file.originalname.split('.').slice(0, -1).join('.'); 
+      const fileName = req.file.originalname.split('.').slice(0, -1).join('.');
       fs.createReadStream(filePath)
         .pipe(csv())
         .on('data', (row) => {
@@ -286,7 +306,6 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
           }
         });
     } else {
-      // Direct request with 'url' and 'all_pages' fields
       const { url, all_pages } = req.body;
 
       if (!url || !all_pages) {
@@ -317,7 +336,10 @@ async function processRowsInParallel(rows, parentFolderId) {
     const { url, all_pages } = row;
 
     if (all_pages === 'yes') {
-      const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
+      let pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
+      if (pages.length === 0) {
+        pages = [url];
+      }
       const pageTexts = await Promise.all(
         pages.map(async (page) => {
           const text = await getPageText(page);
