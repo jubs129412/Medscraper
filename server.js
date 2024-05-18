@@ -87,7 +87,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     const docs = google.docs({ version: 'v1', auth: authClient });
     const drive = google.drive({ version: 'v3', auth: authClient });
 
-    // Create a folder within the current folder
+    // Create a folder within the parent folder
     const folderMetadata = {
       'name': 'Processed Documents',
       'parents': [parentFolderId],
@@ -101,10 +101,20 @@ async function createAndMoveDocument(content, url, parentFolderId) {
 
     const folderId = folder.data.id;
 
-    // Create the document
+    // Set the folder permission to public
+    await drive.permissions.create({
+      resource: {
+        'type': 'anyone',
+        'role': 'writer'
+      },
+      fileId: folderId,
+    });
+
+    // Create the document within the folder
     const docCreationResponse = await docs.documents.create({
       requestBody: {
-        title: url
+        title: url,
+        parents: [folderId] // Set the parent folder for the document
       }
     });
 
@@ -130,21 +140,13 @@ async function createAndMoveDocument(content, url, parentFolderId) {
 
     console.log("Text updated in document.");
 
-    // Move the document to the created folder
-    const fileMoveResponse = await drive.files.update({
-      fileId: documentId,
-      addParents: folderId,
-      removeParents: 'root',
-      fields: 'id, parents'
-    });
-
-    console.log(`Document moved to folder with ID: ${folderId}`);
     return `https://docs.google.com/document/d/${documentId}`;
   } catch (error) {
     console.error('Error:', error.message);
     return null;
   }
 }
+
 
 async function generateText(text) {
   try {
