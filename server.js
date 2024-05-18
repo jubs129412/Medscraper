@@ -225,58 +225,54 @@ async function scrapeLocal(url, parentFolderId) {
   }
 }
 
-async function getUrlsFromSitemap(sitemapUrl, depth = 0) {
-  if (depth > MAX_RECURSION_DEPTH) {
-    console.error(`Maximum recursion depth of ${MAX_RECURSION_DEPTH} exceeded for URL: ${sitemapUrl}`);
-    return [];
-  }
+async function getUrlsFromSitemap(sitemapUrl) {
+  let urls = [];
+  let stack = [sitemapUrl];
+  let depth = 0;
 
-  try {
-    sitemapUrl = sitemapUrl.replace(/^http:\/\//i, 'https://');
-    let response;
+  while (stack.length > 0 && depth <= MAX_RECURSION_DEPTH) {
+    const currentUrl = stack.pop();
+    depth++;
 
     try {
-      response = await axios.get(sitemapUrl);
-    } catch (error) {
-      if (sitemapUrl.includes('www.')) {
-        sitemapUrl = sitemapUrl.replace('www.', '');
+      currentUrl = currentUrl.replace(/^http:\/\//i, 'https://');
+      let response;
+
+      try {
+        response = await axios.get(currentUrl);
+      } catch (error) {
+        if (currentUrl.includes('www.')) {
+          currentUrl = currentUrl.replace('www.', '');
+        } else {
+          currentUrl = currentUrl.replace('https://', 'https://www.');
+        }
+        response = await axios.get(currentUrl);
+      }
+
+      const $ = cheerio.load(response.data, { xmlMode: true });
+
+      const sitemapIndex = $('sitemapindex');
+      if (sitemapIndex.length > 0) {
+        sitemapIndex.find('sitemap loc').each((index, element) => {
+          stack.push($(element).text());
+        });
       } else {
-        sitemapUrl = sitemapUrl.replace('https://', 'https://www.');
+        const maxUrls = 10; // Adjust as needed
+        $('url loc').each((index, element) => {
+          if (index >= maxUrls) return false;
+          urls.push($(element).text());
+        });
       }
-      response = await axios.get(sitemapUrl);
+    } catch (error) {
+      console.error('Error fetching sitemap:', error);
     }
-
-    const $ = cheerio.load(response.data, { xmlMode: true });
-
-    const sitemapIndex = $('sitemapindex');
-    if (sitemapIndex.length > 0) {
-      const sitemapUrls = [];
-      sitemapIndex.find('sitemap loc').each((index, element) => {
-        const sitemapUrl = $(element).text();
-        sitemapUrls.push(sitemapUrl);
-      });
-
-      const urls = [];
-      for (const url of sitemapUrls) {
-        const subUrls = await getUrlsFromSitemap(url, depth + 1);
-        urls.push(...subUrls);
-      }
-      return urls;
-    }
-
-    const urls = [];
-    const maxUrls = 10; // Adjust this value as needed
-    $('url loc').each((index, element) => {
-      if (index >= maxUrls) return false;
-      const url = $(element).text();
-      urls.push(url);
-    });
-
-    return urls;
-  } catch (error) {
-    console.error('Error fetching sitemap:', error);
-    return [];
   }
+
+  if (depth > MAX_RECURSION_DEPTH) {
+    console.error(`Maximum recursion depth of ${MAX_RECURSION_DEPTH} exceeded for URL: ${sitemapUrl}`);
+  }
+
+  return urls;
 }
 
 app.use(express.json());
