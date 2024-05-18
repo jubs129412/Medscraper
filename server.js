@@ -72,6 +72,31 @@ function getBaseUrl(websiteUrl) {
   return `${parsedUrl.protocol}//${parsedUrl.hostname}`;
 }
 
+async function makeFolderPublic(folderId) {
+  try {
+    const auth = new google.auth.GoogleAuth({
+      credentials: credentials,
+      scopes: ['https://www.googleapis.com/auth/drive'],
+    });
+
+    const authClient = await auth.getClient();
+    const drive = google.drive({ version: 'v3', auth: authClient });
+
+    await drive.permissions.create({
+      fileId: folderId,
+      requestBody: {
+        role: 'reader',
+        type: 'anyone',
+      },
+    });
+
+    console.log(`Folder with ID: ${folderId} is now public.`);
+  } catch (error) {
+    console.error('Error making folder public:', error);
+  }
+}
+
+
 async function createAndMoveDocument(content, url, parentFolderId) {
   try {
     const auth = new google.auth.GoogleAuth({
@@ -87,41 +112,15 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     const docs = google.docs({ version: 'v1', auth: authClient });
     const drive = google.drive({ version: 'v3', auth: authClient });
 
-    // Create a folder within the parent folder
-    const folderMetadata = {
-      'name': 'Processed Documents',
-      'parents': [parentFolderId],
-      'mimeType': 'application/vnd.google-apps.folder'
-    };
-
-    const folder = await drive.files.create({
-      resource: folderMetadata,
-      fields: 'id'
-    });
-
-    const folderId = folder.data.id;
-
-    // Set the folder permission to public
-    await drive.permissions.create({
-      resource: {
-        'type': 'anyone',
-        'role': 'writer'
-      },
-      fileId: folderId,
-    });
-
-    // Create the document within the folder
     const docCreationResponse = await docs.documents.create({
       requestBody: {
         title: url,
-        parents: [folderId] // Set the parent folder for the document
-      }
+      },
     });
 
     const documentId = docCreationResponse.data.documentId;
     console.log(`Created document with ID: ${documentId}`);
 
-    // Update the document content
     await docs.documents.batchUpdate({
       documentId: documentId,
       requestBody: {
@@ -129,17 +128,25 @@ async function createAndMoveDocument(content, url, parentFolderId) {
           {
             insertText: {
               location: {
-                index: 1
+                index: 1,
               },
-              text: content
-            }
-          }
-        ]
-      }
+              text: content,
+            },
+          },
+        ],
+      },
     });
 
-    console.log("Text updated in document.");
+    console.log('Text updated in document.');
 
+    await drive.files.update({
+      fileId: documentId,
+      addParents: parentFolderId,
+      removeParents: 'root',
+      fields: 'id, parents',
+    });
+
+    console.log(`Document moved to folder with ID: ${parentFolderId}`);
     return `https://docs.google.com/document/d/${documentId}`;
   } catch (error) {
     console.error('Error:', error.message);
@@ -164,7 +171,7 @@ async function generateText(text) {
   }
 }
 
-async function scrapeLocal(url) {
+async function scrapeLocal(url, parentFolderId) {
   try {
     const response = await axios.get(url);
     const $ = cheerio.load(response.data);
@@ -173,7 +180,7 @@ async function scrapeLocal(url) {
     const text = $('body').text();
     const cleanedText = text.replace(/\s+/g, ' ').trim();
     const content = await generateText(cleanedText);
-    const docLink = await createAndMoveDocument(content, url);
+    const docLink = await createAndMoveDocument(content, url, parentFolderId);
     return { content, docLink };
   } catch (error) {
     console.log(error);
@@ -237,8 +244,16 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
           results.push(row);
         })
         .on('end', async () => {
-          const processedResults = await processRowsInParallel(results);
-          sendCsvResponse(res, processedResults);
+          const parentFolderId = process.env.G_DRIVE_FOLDER;
+          const newFolderName = `Uploaded Websites - ${new Date().toISOString()}`;
+          const newFolderId = await createNewFolder(parentFolderId, newFolderName);
+          if (newFolderId) {
+            await makeFolderPublic(newFolderId);
+            const processedResults = await processRowsInParallel(results, newFolderId);
+            sendCsvResponse(res, processedResults);
+          } else {
+            res.status(500).send('Error creating new folder.');
+          }
         });
     } else {
       // Direct request with 'url' and 'all_pages' fields
@@ -248,8 +263,16 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
         return res.status(400).send('URL and all_pages fields are required.');
       }
 
-      const processedResults = await processRowsInParallel([{ url, all_pages }]);
-      sendCsvResponse(res, processedResults);
+      const parentFolderId = process.env.G_DRIVE_FOLDER;
+      const newFolderName = `Uploaded Websites - ${new Date().toISOString()}`;
+      const newFolderId = await createNewFolder(parentFolderId, newFolderName);
+      if (newFolderId) {
+        await makeFolderPublic(newFolderId);
+        const processedResults = await processRowsInParallel([{ url, all_pages }], newFolderId);
+        sendCsvResponse(res, processedResults);
+      } else {
+        res.status(500).send('Error creating new folder.');
+      }
     }
   } catch (error) {
     console.error('Error processing request:', error);
@@ -257,7 +280,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
   }
 });
 
-async function processRowsInParallel(rows) {
+async function processRowsInParallel(rows, parentFolderId) {
   const promises = rows.map(async (row) => {
     const { url, all_pages } = row;
 
@@ -270,11 +293,11 @@ async function processRowsInParallel(rows) {
         })
       );
       const content = await generateText(pageTexts.join('\n'));
-      const docLink = await createAndMoveDocument(content, url);
+      const docLink = await createAndMoveDocument(content, url, parentFolderId);
       console.log(`${url} - all pages`);
       return { ...row, doc_link: docLink };
     } else if (all_pages === 'no') {
-      const { content, docLink } = await scrapeLocal(url);
+      const { content, docLink } = await scrapeLocal(url, parentFolderId);
       return { ...row, doc_link: docLink };
     } else {
       console.log(`Invalid value for "all_pages" for URL: ${url}`);
