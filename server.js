@@ -371,9 +371,11 @@ async function processRowsInParallel(rows, parentFolderId) {
       if (pageTexts.length > 100){
       var content = await generateText(pageTexts.join('\n'));
       var docLink = await createAndMoveDocument(content, url, parentFolderId);
+      
     }
     else {
       console.log("content too short! not adding")
+      res.status(500).send('No content found!');
     }
       
 
