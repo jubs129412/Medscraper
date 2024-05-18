@@ -375,7 +375,7 @@ async function processRowsInParallel(rows, parentFolderId) {
     }
     else {
       console.log("content too short! not adding")
-      res.status(500).send('No content found!');
+      //res.status(500).send('No content found!');
     }
       
 
