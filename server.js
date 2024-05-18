@@ -9,6 +9,7 @@ const multer = require('multer');
 const { OpenAI } = require('openai');
 const { convert } = require('html-to-text');
 const { Parser } = require('json2csv');
+const pLimit = require('p-limit');
 require('dotenv').config();
 
 const options = { wordwrap: 130 };
@@ -101,7 +102,6 @@ async function createNewFolder(parentFolderId, folderName) {
   }
 }
 
-
 async function makeFolderPublic(folderId) {
   try {
     const auth = new google.auth.GoogleAuth({
@@ -125,7 +125,6 @@ async function makeFolderPublic(folderId) {
     console.error('Error making folder public:', error);
   }
 }
-
 
 async function createAndMoveDocument(content, url, parentFolderId) {
   try {
@@ -183,7 +182,6 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     return null;
   }
 }
-
 
 async function generateText(text) {
   try {
@@ -311,7 +309,9 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
 });
 
 async function processRowsInParallel(rows, parentFolderId) {
-  const promises = rows.map(async (row) => {
+  const limit = pLimit(10); // Limit to 10 promises in parallel
+
+  const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
 
     if (all_pages === 'yes') {
@@ -333,7 +333,7 @@ async function processRowsInParallel(rows, parentFolderId) {
       console.log(`Invalid value for "all_pages" for URL: ${url}`);
       return { ...row, doc_link: null };
     }
-  });
+  }));
 
   return Promise.all(promises);
 }
