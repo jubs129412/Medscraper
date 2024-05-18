@@ -280,7 +280,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
           if (newFolderId) {
             await makeFolderPublic(newFolderId);
             const processedResults = await processRowsInParallel(results, newFolderId);
-            //sendCsvResponse(res, processedResults);
+            await uploadCsvToDrive(newFolderId, fileName, processedResults);
           } else {
             res.status(500).send('Error creating new folder.');
           }
@@ -299,7 +299,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
       if (newFolderId) {
         await makeFolderPublic(newFolderId);
         const processedResults = await processRowsInParallel([{ url, all_pages }], newFolderId);
-        sendCsvResponse(res, processedResults);
+        await uploadCsvToDrive(newFolderId, `output-${new Date().toISOString()}`, processedResults);
       } else {
         res.status(500).send('Error creating new folder.');
       }
@@ -363,4 +363,40 @@ function sendCsvResponse(res, data) {
   res.header('Content-Type', 'text/csv');
   res.attachment('output.csv');
   res.send(csv);
+}
+
+async function uploadCsvToDrive(folderId, fileName, data) {
+  const auth = new google.auth.GoogleAuth({
+    credentials: credentials,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+
+  const authClient = await auth.getClient();
+  const drive = google.drive({ version: 'v3', auth: authClient });
+
+  const fields = Object.keys(data[0]);
+  const parser = new Parser({ fields });
+  const csvContent = parser.parse(data);
+
+  const fileMetadata = {
+    name: `${fileName}.csv`,
+    parents: [folderId],
+  };
+
+  const media = {
+    mimeType: 'text/csv',
+    body: csvContent,
+  };
+
+  try {
+    const file = await drive.files.create({
+      resource: fileMetadata,
+      media: media,
+      fields: 'id',
+    });
+
+    console.log(`CSV file uploaded with ID: ${file.data.id}`);
+  } catch (error) {
+    console.error('Error uploading CSV file:', error);
+  }
 }
