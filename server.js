@@ -1,6 +1,6 @@
 const { google } = require('googleapis');
 const express = require('express');
-const https = require('https');
+const https = require('https');     
 const csv = require('csv-parser');
 const fs = require('fs');
 const cors = require('cors');
@@ -224,10 +224,16 @@ async function scrapeLocal(url, parentFolderId) {
   }
 }
 
-async function getUrlsFromSitemap(sitemapUrl) {
+async function getUrlsFromSitemap(sitemapUrl, depth = 0) {
+  if (depth > MAX_RECURSION_DEPTH) {
+    console.error(`Maximum recursion depth of ${MAX_RECURSION_DEPTH} exceeded for URL: ${sitemapUrl}`);
+    return [];
+  }
+
   try {
     sitemapUrl = sitemapUrl.replace(/^http:\/\//i, 'https://');
     let response;
+
     try {
       response = await axios.get(sitemapUrl);
     } catch (error) {
@@ -251,7 +257,7 @@ async function getUrlsFromSitemap(sitemapUrl) {
 
       const urls = [];
       for (const url of sitemapUrls) {
-        const subUrls = await getUrlsFromSitemap(url);
+        const subUrls = await getUrlsFromSitemap(url, depth + 1);
         urls.push(...subUrls);
       }
       return urls;
