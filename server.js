@@ -3,7 +3,9 @@ const express = require('express');
 const csv = require('csv-parser');
 const fs = require('fs');
 const cors = require('cors');
-const axios = require('axios');
+const axios = require('axios').create({
+  httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+});
 const cheerio = require('cheerio');
 const multer = require('multer');
 const { OpenAI } = require('openai');
@@ -224,9 +226,20 @@ async function scrapeLocal(url, parentFolderId) {
 async function getUrlsFromSitemap(sitemapUrl) {
   try {
     sitemapUrl = sitemapUrl.replace(/^http:\/\//i, 'https://');
-    let response = await axios.get(sitemapUrl);
+    let response;
+    try {
+      response = await axios.get(sitemapUrl);
+    } catch (error) {
+      if (sitemapUrl.includes('www.')) {
+        sitemapUrl = sitemapUrl.replace('www.', '');
+      } else {
+        sitemapUrl = sitemapUrl.replace('https://', 'https://www.');
+      }
+      response = await axios.get(sitemapUrl);
+    }
+
     const $ = cheerio.load(response.data, { xmlMode: true });
-    
+
     const sitemapIndex = $('sitemapindex');
     if (sitemapIndex.length > 0) {
       const sitemapUrls = [];
@@ -254,26 +267,6 @@ async function getUrlsFromSitemap(sitemapUrl) {
     return urls;
   } catch (error) {
     console.error('Error fetching sitemap:', error);
-    if (sitemapUrl.includes('www.')) {
-      try {
-        sitemapUrl = sitemapUrl.replace('www.', '');
-        const response = await axios.get(sitemapUrl);
-        const $ = cheerio.load(response.data, { xmlMode: true });
-
-        const urls = [];
-        const maxUrls = 10; // Adjust this value as needed
-        $('url loc').each((index, element) => {
-          if (index >= maxUrls) return false;
-          const url = $(element).text();
-          urls.push(url);
-        });
-
-        return urls;
-      } catch (error) {
-        console.error('Error fetching sitemap without www:', error);
-        return [];
-      }
-    }
     return [];
   }
 }
