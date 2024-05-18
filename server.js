@@ -368,8 +368,15 @@ async function processRowsInParallel(rows, parentFolderId) {
           return convert(text, options);
         })
       );
-      const content = await generateText(pageTexts.join('\n'));
-      const docLink = await createAndMoveDocument(content, url, parentFolderId);
+      if (content.length > 100){
+      var content = await generateText(pageTexts.join('\n'));
+      var docLink = await createAndMoveDocument(content, url, parentFolderId);
+    }
+    else {
+      console.log("content too short! not adding")
+    }
+      
+
       console.log(`${url} - all pages`);
       return { ...row, doc_link: docLink };
     } else if (all_pages === 'no') {
