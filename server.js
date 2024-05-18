@@ -368,7 +368,7 @@ async function processRowsInParallel(rows, parentFolderId) {
           return convert(text, options);
         })
       );
-      if (pageTexts.length > 100){
+      if (pageTexts.join('\n').length > 100){
       var content = await generateText(pageTexts.join('\n'));
       var docLink = await createAndMoveDocument(content, url, parentFolderId);
       
