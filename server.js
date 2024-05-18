@@ -82,8 +82,21 @@ function getBaseUrl(websiteUrl) {
   }
 }
 
+async function retryWithBackoff(fn, retries = 5, delay = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      const waitTime = delay * Math.pow(2, i);
+      console.warn(`Retrying in ${waitTime / 1000} seconds...`);
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+    }
+  }
+}
+
 async function createNewFolder(parentFolderId, folderName) {
-  try {
+  const createFolder = async () => {
     const auth = new google.auth.GoogleAuth({
       credentials: credentials,
       scopes: ['https://www.googleapis.com/auth/drive'],
@@ -105,6 +118,10 @@ async function createNewFolder(parentFolderId, folderName) {
 
     console.log(`Folder created with ID: ${folder.data.id}`);
     return folder.data.id;
+  };
+
+  try {
+    return await retryWithBackoff(createFolder);
   } catch (error) {
     console.error('Error creating folder:', error);
     return null;
@@ -112,7 +129,7 @@ async function createNewFolder(parentFolderId, folderName) {
 }
 
 async function makeFolderPublic(folderId) {
-  try {
+  const makePublic = async () => {
     const auth = new google.auth.GoogleAuth({
       credentials: credentials,
       scopes: ['https://www.googleapis.com/auth/drive'],
@@ -130,13 +147,17 @@ async function makeFolderPublic(folderId) {
     });
 
     console.log(`Folder with ID: ${folderId} is now public.`);
+  };
+
+  try {
+    await retryWithBackoff(makePublic);
   } catch (error) {
     console.error('Error making folder public:', error);
   }
 }
 
 async function createAndMoveDocument(content, url, parentFolderId) {
-  try {
+  const createDocument = async () => {
     const auth = new google.auth.GoogleAuth({
       credentials: credentials,
       scopes: [
@@ -186,6 +207,10 @@ async function createAndMoveDocument(content, url, parentFolderId) {
 
     console.log(`Document moved to folder with ID: ${parentFolderId}`);
     return `https://docs.google.com/document/d/${documentId}`;
+  };
+
+  try {
+    return await retryWithBackoff(createDocument);
   } catch (error) {
     console.error('Error:', error.message);
     return null;
@@ -385,29 +410,29 @@ function sendCsvResponse(res, data) {
 }
 
 async function uploadCsvToDrive(folderId, fileName, data) {
-  const auth = new google.auth.GoogleAuth({
-    credentials: credentials,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
+  const uploadCsv = async () => {
+    const auth = new google.auth.GoogleAuth({
+      credentials: credentials,
+      scopes: ['https://www.googleapis.com/auth/drive'],
+    });
 
-  const authClient = await auth.getClient();
-  const drive = google.drive({ version: 'v3', auth: authClient });
+    const authClient = await auth.getClient();
+    const drive = google.drive({ version: 'v3', auth: authClient });
 
-  const fields = Object.keys(data[0]);
-  const parser = new Parser({ fields });
-  const csvContent = parser.parse(data);
+    const fields = Object.keys(data[0]);
+    const parser = new Parser({ fields });
+    const csvContent = parser.parse(data);
 
-  const fileMetadata = {
-    name: `${fileName}.csv`,
-    parents: [folderId],
-  };
+    const fileMetadata = {
+      name: `${fileName}.csv`,
+      parents: [folderId],
+    };
 
-  const media = {
-    mimeType: 'text/csv',
-    body: csvContent,
-  };
+    const media = {
+      mimeType: 'text/csv',
+      body: csvContent,
+    };
 
-  try {
     const file = await drive.files.create({
       resource: fileMetadata,
       media: media,
@@ -415,6 +440,10 @@ async function uploadCsvToDrive(folderId, fileName, data) {
     });
 
     console.log(`CSV file uploaded with ID: ${file.data.id}`);
+  };
+
+  try {
+    await retryWithBackoff(uploadCsv);
   } catch (error) {
     console.error('Error uploading CSV file:', error);
   }
