@@ -96,7 +96,7 @@ async function createAndMoveDocument(content, url) {
     const documentId = docCreationResponse.data.documentId;
     console.log(`Created document with ID: ${documentId}`);
 
-    const updateResponse = await docs.documents.batchUpdate({
+    await docs.documents.batchUpdate({
       documentId: documentId,
       requestBody: {
         requests: [
@@ -116,7 +116,7 @@ async function createAndMoveDocument(content, url) {
 
     const folderId = process.env.G_DRIVE_FOLDER;
 
-    const fileMoveResponse = await drive.files.update({
+    await drive.files.update({
       fileId: documentId,
       addParents: folderId,
       removeParents: 'root',
@@ -135,12 +135,11 @@ async function generateText(text) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    console.log(prompt + text);
     const chatCompletion = await openai.chat.completions.create({
       messages: [{ role: 'user', content: prompt + text }],
       model: process.env.GPT_MODEL,
     });
-    console.log(chatCompletion.choices[0].message.content);
+
     return chatCompletion.choices[0].message.content;
   } catch (error) {
     console.log(error);
@@ -157,7 +156,6 @@ async function scrapeLocal(url) {
     const text = $('body').text();
     const cleanedText = text.replace(/\s+/g, ' ').trim();
     const content = await generateText(cleanedText);
-    console.log(content);
     const docLink = await createAndMoveDocument(content, url);
     return { content, docLink };
   } catch (error) {
@@ -169,130 +167,4 @@ async function scrapeLocal(url) {
 async function getUrlsFromSitemap(sitemapUrl) {
   try {
     const response = await axios.get(sitemapUrl);
-    const $ = cheerio.load(response.data, { xmlMode: true });
-
-    // Check if the response is an index of sitemaps
-    const sitemapIndex = $('sitemapindex');
-    if (sitemapIndex.length > 0) {
-      // If it's an index of sitemaps, extract individual sitemap URLs and retrieve their contents
-      const sitemapUrls = [];
-      sitemapIndex.find('sitemap loc').each((index, element) => {
-        const sitemapUrl = $(element).text();
-        sitemapUrls.push(sitemapUrl);
-      });
-
-      // Fetch URLs from individual sitemaps recursively
-      const urls = [];
-      for (const url of sitemapUrls) {
-        const subUrls = await getUrlsFromSitemap(url);
-        urls.push(...subUrls);
-      }
-
-      return urls;
-    }
-
-    // If it's a direct sitemap, extract URLs
-    const urls = [];
-    const maxUrls = 10;
-    $('url loc').each((index, element) => {
-      if (index >= maxUrls) return false;
-      const url = $(element).text();
-      console.log(url);
-      urls.push(url);
-    });
-
-    return urls;
-  } catch (error) {
-    console.error('Error fetching sitemap:', error);
-    return [];
-  }
-}
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-app.post('/upload', upload.single('csv'), async (req, res) => {
-  try {
-    const results = [];
-    if (req.file) {
-      // CSV file upload case
-      const filePath = req.file.path;
-      fs.createReadStream(filePath)
-        .pipe(csv())
-        .on('data', async (row) => {
-          results.push(row);
-        })
-        .on('end', async () => {
-          const processedResults = await processRows(results);
-          sendCsvResponse(res, processedResults);
-        });
-    } else {
-      // Direct request with 'url' and 'all_pages' fields
-      const { url, all_pages } = req.body;
-
-      if (!url || !all_pages) {
-        return res.status(400).send('URL and all_pages fields are required.');
-      }
-
-      const processedResults = await processRows([{ url, all_pages }]);
-      sendCsvResponse(res, processedResults);
-    }
-  } catch (error) {
-    console.error('Error processing request:', error);
-    //res.status(500).send('Internal Server Error');
-  }
-});
-
-async function processRows(rows) {
-  const results = [];
-
-  for (const row of rows) {
-    const { url, all_pages } = row;
-
-    if (all_pages.toLowerCase() === 'yes') {
-      const pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
-      const pageTexts = await Promise.all(pages.map(async (page) => {
-        const text = await getPageText(page);
-        return convert(text, options);
-      }));
-      const content = await generateText(pageTexts.join('\n'));
-      const docLink = await createAndMoveDocument(content, url);
-      results.push({ ...row, doc_link: docLink });
-      console.log(`${url} - all pages`);
-    } else if (all_pages.toLowerCase() === 'no') {
-      console.log(url);
-      const { content, docLink } = await scrapeLocal(url);
-      console.log(content);
-      results.push({ ...row, doc_link: docLink });
-    } else {
-      console.log(`Invalid value for "all_pages" for URL: ${url}`);
-    }
-  }
-
-  return results;
-}
-
-async function getPageText(url) {
-  try {
-    const response = await axios.get(url);
-    const $ = cheerio.load(response.data);
-    $('script').remove();
-    $('style').remove();
-    const text = $('body').text();
-    const cleanedText = text.replace(/\s+/g, ' ').trim();
-    return cleanedText;
-  } catch (error) {
-    console.error('Error retrieving page text:', error);
-    return '';
-  }
-}
-
-function sendCsvResponse(res, data) {
-  const fields = Object.keys(data[0]);
-  const parser = new Parser({ fields });
-  const csv = parser.parse(data);
-
-  res.header('Content-Type', 'text/csv');
-  res.attachment('output.csv');
-  res.send(csv);
-}
+    const $ = cheerio.load(response.data,
