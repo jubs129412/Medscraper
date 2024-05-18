@@ -266,19 +266,21 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
     if (req.file) {
       // CSV file upload case
       const filePath = req.file.path;
+      const fileName = req.file.originalname.split('.').slice(0, -1).join('.'); 
       fs.createReadStream(filePath)
         .pipe(csv())
         .on('data', (row) => {
           results.push(row);
         })
         .on('end', async () => {
+          res.send('CSV file processing done.');
           const parentFolderId = process.env.G_DRIVE_FOLDER;
-          const newFolderName = `Uploaded Websites - ${new Date().toISOString()}`;
+          const newFolderName = fileName;
           const newFolderId = await createNewFolder(parentFolderId, newFolderName);
           if (newFolderId) {
             await makeFolderPublic(newFolderId);
             const processedResults = await processRowsInParallel(results, newFolderId);
-            sendCsvResponse(res, processedResults);
+            //sendCsvResponse(res, processedResults);
           } else {
             res.status(500).send('Error creating new folder.');
           }
