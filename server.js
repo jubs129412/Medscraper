@@ -339,13 +339,10 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
       //const parentFolderId = process.env.G_DRIVE_FOLDER;
       //const newFolderName = `${url}`;
       //const newFolderId = await createNewFolder(parentFolderId, newFolderName);
-      if (newFolderId) {
         //await makeFolderPublic(newFolderId);
         const processedResults = await processRowsInParallel([{ url, all_pages }], parentFolderId);
         //await uploadCsvToDrive(parentFolderId, `output-${new Date().toISOString()}`, processedResults);
-      } else {
-        res.status(500).send('Error creating new folder.');
-      }
+
     }
   } catch (error) {
     console.error('Error processing request:', error);
