@@ -296,7 +296,7 @@ async function getUrlsFromSitemap(sitemapUrl) {
   if (depth > MAX_RECURSION_DEPTH) {
     console.error(`Maximum recursion depth of ${MAX_RECURSION_DEPTH} exceeded for URL: ${sitemapUrl}`);
   }
-
+console.log(urls)
   return urls;
 }
 
