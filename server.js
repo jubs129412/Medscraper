@@ -336,7 +336,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
       }
       res.send('url processing.');
 
-      //const parentFolderId = process.env.G_DRIVE_FOLDER;
+      const parentFolderId = process.env.G_DRIVE_FOLDER;
       //const newFolderName = `${url}`;
       //const newFolderId = await createNewFolder(parentFolderId, newFolderName);
         //await makeFolderPublic(newFolderId);
