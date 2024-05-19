@@ -256,7 +256,7 @@ async function getUrlsFromSitemap(sitemapUrl) {
   let depth = 0;
 
   while (stack.length > 0 && depth <= MAX_RECURSION_DEPTH) {
-    const currentUrl = stack.pop();
+    let currentUrl = stack.pop();  // Change from const to let
     depth++;
 
     try {
@@ -299,6 +299,7 @@ async function getUrlsFromSitemap(sitemapUrl) {
 
   return urls;
 }
+
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
