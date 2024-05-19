@@ -334,6 +334,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
       if (!url || !all_pages) {
         return res.status(400).send('URL and all_pages fields are required.');
       }
+      res.send('url processing.');
 
       const parentFolderId = process.env.G_DRIVE_FOLDER;
       const newFolderName = `Uploaded Websites - ${new Date().toISOString()}`;
