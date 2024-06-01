@@ -14,7 +14,7 @@ const { convert } = require('html-to-text');
 const { Parser } = require('json2csv');
 const pLimit = require('p-limit');
 require('dotenv').config();
-const MAX_RECURSION_DEPTH = 5;
+const MAX_RECURSION_DEPTH = 2;
 
 const options = { wordwrap: 130 };
 
@@ -256,7 +256,7 @@ async function getUrlsFromSitemap(sitemapUrl) {
   let depth = 0;
 
   while (stack.length > 0 && depth <= MAX_RECURSION_DEPTH) {
-    let currentUrl = stack.pop();  // Change from const to let
+    let currentUrl = stack.pop();  
     depth++;
 
     try {
@@ -351,7 +351,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
 });
 
 async function processRowsInParallel(rows, parentFolderId) {
-  const limit = pLimit(10); // Limit to 10 promises in parallel
+  const limit = pLimit(3); 
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
@@ -374,7 +374,6 @@ async function processRowsInParallel(rows, parentFolderId) {
     }
     else {
       console.log("content too short! not adding")
-      //res.status(500).send('No content found!');
     }
       
 
