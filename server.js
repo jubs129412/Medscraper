@@ -261,7 +261,7 @@ async function getUrlsFromSitemap(sitemapUrl) {
   let depth = 0;
 
   while (stack.length > 0 && depth <= MAX_RECURSION_DEPTH) {
-    let currentUrl = stack.pop();
+    let currentUrl = stack.pop();  
     depth++;
 
     try {
@@ -293,14 +293,6 @@ async function getUrlsFromSitemap(sitemapUrl) {
           urls.push($(element).text());
         });
       }
-
-      // Clear Cheerio object
-      $.root().empty();
-      $ = null;
-
-      // Clear axios response
-      response = null;
-
     } catch (error) {
       console.error('Error fetching sitemap:', error);
     }
@@ -309,10 +301,9 @@ async function getUrlsFromSitemap(sitemapUrl) {
   if (depth > MAX_RECURSION_DEPTH) {
     console.error(`Maximum recursion depth of ${MAX_RECURSION_DEPTH} exceeded for URL: ${sitemapUrl}`);
   }
-
+console.log(urls)
   return urls;
 }
-
 
 
 app.use(express.json());
@@ -413,11 +404,6 @@ async function getPageText(url) {
     $('style').remove();
     const text = $('body').text();
     const cleanedText = text.replace(/\s+/g, ' ').trim();
-    $.root().empty();
-  $ = null; // Nullify Cheerio object
-  response = null; // Nullify axios response object
-  cleanedText = null; // Nullify cleaned text variable
-
     return cleanedText;
   } catch (error) {
     console.error('Error retrieving page text:', error);
