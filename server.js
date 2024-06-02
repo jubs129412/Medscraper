@@ -15,7 +15,7 @@ const { convert } = require('html-to-text');
 const { Parser } = require('json2csv');
 const pLimit = require('p-limit');
 require('dotenv').config();
-const MAX_RECURSION_DEPTH = 2;
+const MAX_RECURSION_DEPTH = 5;
 
 const options = { wordwrap: 130 };
 
@@ -302,6 +302,12 @@ async function getUrlsFromSitemap(sitemapUrl) {
           if (index >= maxUrls) return false;
           urls.push($(element).text());
         });
+
+        // If no usable URLs found and there are more sitemaps, continue to the next sitemap
+        if (urls.length === 0 && stack.length > 0) {
+          console.log('No usable URLs found in current sitemap. Continuing to the next sitemap...');
+          continue;
+        }
       }
     } catch (error) {
       console.error('Error fetching sitemap:', error);
