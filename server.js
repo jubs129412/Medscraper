@@ -302,12 +302,6 @@ async function getUrlsFromSitemap(sitemapUrl) {
           if (index >= maxUrls) return false;
           urls.push($(element).text());
         });
-
-        // If no usable URLs found and there are more sitemaps, continue to the next sitemap
-        if (urls.length === 0 && stack.length > 0) {
-          console.log('No usable URLs found in current sitemap. Continuing to the next sitemap...');
-          continue;
-        }
       }
     } catch (error) {
       console.error('Error fetching sitemap:', error);
