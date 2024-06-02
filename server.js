@@ -261,8 +261,10 @@ async function getUrlsFromSitemap(sitemapUrl) {
   let stack = [sitemapUrl];
   let depth = 0;
 
+  const mediaContentTypes = ['image/', 'video/', 'audio/'];
+
   while (stack.length > 0 && depth <= MAX_RECURSION_DEPTH) {
-    let currentUrl = stack.pop();  
+    let currentUrl = stack.pop();
     depth++;
 
     try {
@@ -270,14 +272,21 @@ async function getUrlsFromSitemap(sitemapUrl) {
       let response;
 
       try {
-        response = await axios.get(currentUrl);
+        response = await axios.head(currentUrl); // Send a HEAD request to get headers only
       } catch (error) {
         if (currentUrl.includes('www.')) {
           currentUrl = currentUrl.replace('www.', '');
         } else {
           currentUrl = currentUrl.replace('https://', 'https://www.');
         }
-        response = await axios.get(currentUrl);
+        response = await axios.head(currentUrl);
+      }
+
+      const contentType = response.headers['content-type'];
+
+      if (contentType && mediaContentTypes.some(type => contentType.startsWith(type))) {
+        console.log(`Skipping media file: ${currentUrl}`);
+        continue; // Skip media files
       }
 
       const $ = cheerio.load(response.data, { xmlMode: true });
@@ -302,9 +311,11 @@ async function getUrlsFromSitemap(sitemapUrl) {
   if (depth > MAX_RECURSION_DEPTH) {
     console.error(`Maximum recursion depth of ${MAX_RECURSION_DEPTH} exceeded for URL: ${sitemapUrl}`);
   }
-console.log(urls)
+
+  console.log(urls);
   return urls;
 }
+
 
 
 app.use(express.json());
