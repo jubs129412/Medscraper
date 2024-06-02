@@ -256,50 +256,69 @@ async function scrapeLocal(url, parentFolderId) {
   }
 }
 
-async function getUrlsFromSitemaps(sitemapUrls) {
+
+async function getUrlsFromSitemap(sitemapUrl) {
   let urls = [];
+  let stack = [sitemapUrl];
+  let hasRegularSitemap = false; // Flag to track if a regular sitemap is found
   const mediaContentTypes = ['image/', 'video/', 'audio/'];
-
-  for (let sitemapUrl of sitemapUrls) {
+  
+  while (stack.length > 0 && urls.length < 10) {
+    const currentUrl = stack.pop();
+    
     try {
-      sitemapUrl = sitemapUrl.replace(/^http:\/\//i, 'https://');
-
-      let response;
-      try {
-        response = await axios.get(sitemapUrl);
-      } catch (error) {
-        console.error('Error fetching sitemap:', error);
-        continue; // Skip to the next sitemap URL
-      }
-
+      const response = await axios.get(currentUrl);
       const contentType = response.headers['content-type'];
 
       if (contentType && mediaContentTypes.some(type => contentType.startsWith(type))) {
-        console.log(`Skipping media file: ${sitemapUrl}`);
+        console.log(`Skipping media file: ${currentUrl}`);
         continue; // Skip media files
       }
 
       const $ = cheerio.load(response.data, { xmlMode: true });
-
+      
       const sitemapIndex = $('sitemapindex');
       if (sitemapIndex.length > 0) {
         sitemapIndex.find('sitemap loc').each((index, element) => {
-          sitemapUrls.push($(element).text()); // Add sub-sitemap URL to the list for further processing
+          stack.push($(element).text());
         });
       } else {
         $('url loc').each((index, element) => {
+          if (urls.length >= 10) return false;
           urls.push($(element).text());
         });
+
+        // If this is a regular sitemap, set the flag to true
+        hasRegularSitemap = true;
       }
     } catch (error) {
-      console.error('Error processing sitemap:', error);
+      console.error('Error fetching sitemap:', error);
+    }
+  }
+
+  // If no regular sitemap is found and there are media sitemap URLs in the stack, fetch URLs from them
+  if (!hasRegularSitemap && stack.length > 0) {
+    console.log('No regular sitemap found. Fetching URLs from media sitemaps...');
+    while (stack.length > 0 && urls.length < 10) {
+      const currentUrl = stack.pop();
+      
+      try {
+        const response = await axios.get(currentUrl);
+        const $ = cheerio.load(response.data, { xmlMode: true });
+
+        $('url loc').each((index, element) => {
+          if (urls.length >= 10) return false;
+          urls.push($(element).text());
+        });
+      } catch (error) {
+        console.error('Error fetching media sitemap:', error);
+      }
     }
   }
 
   console.log(urls);
   return urls;
 }
-
 
 
 
