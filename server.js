@@ -259,29 +259,13 @@ async function scrapeLocal(url, parentFolderId) {
 async function getUrlsFromSitemap(sitemapUrl) {
   let urls = [];
   let stack = [sitemapUrl];
-  let depth = 0;
-
   const mediaContentTypes = ['image/', 'video/', 'audio/'];
-
-  while (stack.length > 0 && depth <= MAX_RECURSION_DEPTH) {
-    let currentUrl = stack.pop();
-    depth++;
-
+  
+  while (stack.length > 0 && urls.length < 10) {
+    const currentUrl = stack.pop();
+    
     try {
-      currentUrl = currentUrl.replace(/^http:\/\//i, 'https://');
-      let response;
-
-      try {
-        response = await axios.head(currentUrl); // Send a HEAD request to get headers only
-      } catch (error) {
-        if (currentUrl.includes('www.')) {
-          currentUrl = currentUrl.replace('www.', '');
-        } else {
-          currentUrl = currentUrl.replace('https://', 'https://www.');
-        }
-        response = await axios.head(currentUrl);
-      }
-
+      const response = await axios.get(currentUrl);
       const contentType = response.headers['content-type'];
 
       if (contentType && mediaContentTypes.some(type => contentType.startsWith(type))) {
@@ -290,16 +274,15 @@ async function getUrlsFromSitemap(sitemapUrl) {
       }
 
       const $ = cheerio.load(response.data, { xmlMode: true });
-
+      
       const sitemapIndex = $('sitemapindex');
       if (sitemapIndex.length > 0) {
         sitemapIndex.find('sitemap loc').each((index, element) => {
           stack.push($(element).text());
         });
       } else {
-        const maxUrls = 10; // Adjust as needed
         $('url loc').each((index, element) => {
-          if (index >= maxUrls) return false;
+          if (urls.length >= 10) return false;
           urls.push($(element).text());
         });
       }
@@ -308,13 +291,10 @@ async function getUrlsFromSitemap(sitemapUrl) {
     }
   }
 
-  if (depth > MAX_RECURSION_DEPTH) {
-    console.error(`Maximum recursion depth of ${MAX_RECURSION_DEPTH} exceeded for URL: ${sitemapUrl}`);
-  }
-
   console.log(urls);
   return urls;
 }
+
 
 
 
