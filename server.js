@@ -256,38 +256,43 @@ async function scrapeLocal(url, parentFolderId) {
   }
 }
 
-async function getUrlsFromSitemap(sitemapUrl) {
+async function getUrlsFromSitemaps(sitemapUrls) {
   let urls = [];
-  let stack = [sitemapUrl];
   const mediaContentTypes = ['image/', 'video/', 'audio/'];
-  
-  while (stack.length > 0 && urls.length < 10) {
-    const currentUrl = stack.pop();
-    
+
+  for (let sitemapUrl of sitemapUrls) {
     try {
-      const response = await axios.get(currentUrl);
+      sitemapUrl = sitemapUrl.replace(/^http:\/\//i, 'https://');
+
+      let response;
+      try {
+        response = await axios.get(sitemapUrl);
+      } catch (error) {
+        console.error('Error fetching sitemap:', error);
+        continue; // Skip to the next sitemap URL
+      }
+
       const contentType = response.headers['content-type'];
 
       if (contentType && mediaContentTypes.some(type => contentType.startsWith(type))) {
-        console.log(`Skipping media file: ${currentUrl}`);
+        console.log(`Skipping media file: ${sitemapUrl}`);
         continue; // Skip media files
       }
 
       const $ = cheerio.load(response.data, { xmlMode: true });
-      
+
       const sitemapIndex = $('sitemapindex');
       if (sitemapIndex.length > 0) {
         sitemapIndex.find('sitemap loc').each((index, element) => {
-          stack.push($(element).text());
+          sitemapUrls.push($(element).text()); // Add sub-sitemap URL to the list for further processing
         });
       } else {
         $('url loc').each((index, element) => {
-          if (urls.length >= 10) return false;
           urls.push($(element).text());
         });
       }
     } catch (error) {
-      console.error('Error fetching sitemap:', error);
+      console.error('Error processing sitemap:', error);
     }
   }
 
