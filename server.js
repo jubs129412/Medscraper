@@ -234,24 +234,24 @@ async function generateText(text) {
 }
 
 async function scrapeLocal(url, parentFolderId) {
+  let response;
+  let $;
   try {
-    const response = await axios.get(url);
-    const $ = cheerio.load(response.data);
+    response = await axios.get(url);
+    $ = cheerio.load(response.data);
     $('script').remove();
     $('style').remove();
     const text = $('body').text();
     const cleanedText = text.replace(/\s+/g, ' ').trim();
     const content = await generateText(cleanedText);
     const docLink = await createAndMoveDocument(content, url, parentFolderId);
-    $.root().empty();
     return { content, docLink };
   } catch (error) {
     console.log(error);
-    $.root().empty();
-    $ = null; // Nullify Cheerio object
-  response = null; // Nullify axios response object
-  cleanedText = null; // Nullify cleaned text variable
     return { content: '', docLink: null };
+  } finally {
+    $ = null; // Nullify Cheerio object
+    response = null; // Nullify axios response object
   }
 }
 
@@ -301,10 +301,9 @@ async function getUrlsFromSitemap(sitemapUrl) {
   if (depth > MAX_RECURSION_DEPTH) {
     console.error(`Maximum recursion depth of ${MAX_RECURSION_DEPTH} exceeded for URL: ${sitemapUrl}`);
   }
-console.log(urls)
+  console.log(urls)
   return urls;
 }
-
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -342,12 +341,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
       res.send('url processing.');
 
       const parentFolderId = process.env.G_DRIVE_FOLDER;
-      //const newFolderName = `${url}`;
-      //const newFolderId = await createNewFolder(parentFolderId, newFolderName);
-        //await makeFolderPublic(newFolderId);
-        const processedResults = await processRowsInParallel([{ url, all_pages }], parentFolderId);
-        //await uploadCsvToDrive(parentFolderId, `output-${new Date().toISOString()}`, processedResults);
-
+      const processedResults = await processRowsInParallel([{ url, all_pages }], parentFolderId);
     }
   } catch (error) {
     console.error('Error processing request:', error);
@@ -373,14 +367,12 @@ async function processRowsInParallel(rows, parentFolderId) {
         })
       );
       if (pageTexts.join('\n').length > 100){
-      var content = await generateText(pageTexts.join('\n'));
-      var docLink = await createAndMoveDocument(content, url, parentFolderId);
-      
-    }
-    else {
-      console.log("content too short! not adding")
-    }
-      
+        var content = await generateText(pageTexts.join('\n'));
+        var docLink = await createAndMoveDocument(content, url, parentFolderId);
+      }
+      else {
+        console.log("content too short! not adding")
+      }
 
       console.log(`${url} - all pages`);
       return { ...row, doc_link: docLink };

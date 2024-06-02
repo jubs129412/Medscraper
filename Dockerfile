@@ -8,6 +8,4 @@ RUN npm ci
 
 COPY . .
 
-ENV NODE_OPTIONS="--max-old-space-size=20"
-
 CMD ["node","server.js"]
