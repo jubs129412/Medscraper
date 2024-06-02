@@ -383,6 +383,7 @@ async function isMedia(url) {
   try {
     const response = await axios.head(url);
     const contentType = response.headers['content-type'];
+    console.log(contentType)
     // Check if the content type indicates it's not a media file
     return contentType && !contentType.startsWith('image') && !contentType.startsWith('video');
   } catch (error) {
