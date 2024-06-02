@@ -281,6 +281,7 @@ async function getUrlsFromSitemap(sitemapUrl) {
   }
 
   // Return the 10 most recent URLs if there are more than 10
+  console.log(urls.slice(0, 10))
   return urls.slice(0, 10);
 }
 
