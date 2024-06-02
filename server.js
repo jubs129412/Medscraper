@@ -1,6 +1,7 @@
 const { google } = require('googleapis');
 const express = require('express');
 const https = require('https');     
+const GetSitemapLinks = require("get-sitemap-links").default;
 const csv = require('csv-parser');
 const fs = require('fs');
 const cors = require('cors');
@@ -258,55 +259,31 @@ async function scrapeLocal(url, parentFolderId) {
 
 
 async function getUrlsFromSitemap(sitemapUrl) {
+  const array = await GetSitemapLinks(sitemapUrl);
   let urls = [];
-  let stack = [sitemapUrl];
-  const mediaContentTypes = ['image/', 'video/', 'audio/'];
-  let processedSitemaps = new Set();
 
-  while (stack.length > 0 && urls.length < 10) {
-    const currentUrl = stack.pop();
-
-    try {
-      const response = await axios.get(currentUrl);
-
-      const $ = cheerio.load(response.data, { xmlMode: true });
-
-      if ($('sitemapindex').length > 0) {
-        $('sitemapindex sitemap loc').each((index, element) => {
-          const subSitemapUrl = $(element).text();
-          if (!processedSitemaps.has(subSitemapUrl)) {
-            stack.push(subSitemapUrl);
-            processedSitemaps.add(subSitemapUrl);
+  // Function to check if URL contains certain words
+  const containsForbiddenWords = url => {
+      const forbiddenWords = ['mp4', 'mp3', 'png', 'jpg', 'jpeg'];
+      for (const word of forbiddenWords) {
+          if (url.includes(word)) {
+              return true;
           }
-        });
-      } else {
-        $('url loc').each(async (index, element) => {
-          if (urls.length >= 10) return false;
-          const url = $(element).text();
-          if (!(await isMediaUrl(url, mediaContentTypes))) {
-            urls.push(url);
-          }
-        });
       }
-    } catch (error) {
-      console.error('Error fetching or processing sitemap:', error);
-    }
+      return false;
+  };
+
+  for (const url of array) {
+      // Check if the URL contains forbidden words
+      if (!containsForbiddenWords(url)) {
+          urls.push(url);
+      }
   }
 
-  console.log(urls);
-  return urls;
+  // Return the 10 most recent URLs if there are more than 10
+  return urls.slice(0, 10);
 }
 
-async function isMediaUrl(url, mediaContentTypes) {
-  try {
-    const response = await axios.head(url);
-    const contentType = response.headers['content-type'];
-    return mediaContentTypes.some(type => contentType.startsWith(type));
-  } catch (error) {
-    console.error('Error checking content type:', error);
-    return false; // Treat as non-media URL if there's an error
-  }
-}
 
 
 
@@ -401,15 +378,33 @@ async function processRowsInParallel(rows, parentFolderId) {
   return Promise.all(promises);
 }
 
+async function isMedia(url) {
+  try {
+    const response = await axios.head(url);
+    const contentType = response.headers['content-type'];
+    // Check if the content type indicates it's not a media file
+    return contentType && !contentType.startsWith('image') && !contentType.startsWith('video');
+  } catch (error) {
+    console.error('Error checking media type:', error);
+    return false;
+  }
+}
+
 async function getPageText(url) {
   try {
-    const response = await axios.get(url);
-    const $ = cheerio.load(response.data);
-    $('script').remove();
-    $('style').remove();
-    const text = $('body').text();
-    const cleanedText = text.replace(/\s+/g, ' ').trim();
-    return cleanedText;
+    // Check if the URL is not a media file
+    if (!(await isMedia(url))) {
+      const response = await axios.get(url);
+      const $ = cheerio.load(response.data);
+      $('script').remove();
+      $('style').remove();
+      const text = $('body').text();
+      const cleanedText = text.replace(/\s+/g, ' ').trim();
+      return cleanedText;
+    } else {
+      console.log('The URL points to a media file.');
+      return '';
+    }
   } catch (error) {
     console.error('Error retrieving page text:', error);
     return '';
