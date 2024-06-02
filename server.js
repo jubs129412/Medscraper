@@ -1,6 +1,6 @@
 const { google } = require('googleapis');
 const express = require('express');
-const https = require('https');     
+const https = require('https');
 const csv = require('csv-parser');
 const fs = require('fs');
 const cors = require('cors');
@@ -205,108 +205,93 @@ async function createAndMoveDocument(content, url, parentFolderId) {
       fields: 'id, parents',
     });
 
-    console.log(`Document moved to folder with ID: ${parentFolderId}`);
-    return `https://docs.google.com/document/d/${documentId}`;
+    const docLink = `https://docs.google.com/document/d/${documentId}/edit`;
+    console.log('Document moved and accessible at:', docLink);
+
+    return docLink;
   };
 
   try {
     return await retryWithBackoff(createDocument);
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error creating and moving document:', error);
     return null;
   }
 }
 
-async function generateText(text) {
+async function scrapeLocal(url, parentFolderId) {
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-    const chatCompletion = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt + text }],
-      model: process.env.GPT_MODEL,
-    });
-
-    return chatCompletion.choices[0].message.content;
+    const text = await getPageText(url);
+    const content = await generateText(text);
+    const docLink = await createAndMoveDocument(content, url, parentFolderId);
+    return { content, docLink };
   } catch (error) {
-    console.log(error);
-    return '';
+    console.error('Error scraping local:', error);
+    return { content: '', docLink: '' };
   }
 }
 
-async function scrapeLocal(url, parentFolderId) {
-  let response;
-  let $;
+async function getPageText(url) {
   try {
-    response = await axios.get(url);
-    $ = cheerio.load(response.data);
+    const response = await axios.get(url);
+    const $ = cheerio.load(response.data);
     $('script').remove();
     $('style').remove();
     const text = $('body').text();
     const cleanedText = text.replace(/\s+/g, ' ').trim();
-    const content = await generateText(cleanedText);
-    const docLink = await createAndMoveDocument(content, url, parentFolderId);
-    return { content, docLink };
+    return cleanedText;
   } catch (error) {
-    console.log(error);
-    return { content: '', docLink: null };
-  } finally {
-    $ = null; // Nullify Cheerio object
-    response = null; // Nullify axios response object
+    console.error('Error retrieving page text:', error);
+    return '';
   }
 }
 
-async function getUrlsFromSitemap(sitemapUrl) {
-  let urls = [];
-  let stack = [sitemapUrl];
-  let depth = 0;
+async function generateText(text) {
+  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  try {
+    const response = await openai.completions.create({
+      model: 'text-davinci-003',
+      prompt: `${prompt}${text}`,
+      max_tokens: 3000,
+    });
 
-  while (stack.length > 0 && depth <= MAX_RECURSION_DEPTH) {
-    let currentUrl = stack.pop();  
-    depth++;
+    return response.choices[0].text.trim();
+  } catch (error) {
+    console.error('Error generating text:', error);
+    return '';
+  }
+}
 
-    try {
-      currentUrl = currentUrl.replace(/^http:\/\//i, 'https://');
-      let response;
-
-      try {
-        response = await axios.get(currentUrl);
-      } catch (error) {
-        if (currentUrl.includes('www.')) {
-          currentUrl = currentUrl.replace('www.', '');
-        } else {
-          currentUrl = currentUrl.replace('https://', 'https://www.');
-        }
-        response = await axios.get(currentUrl);
-      }
-
-      const $ = cheerio.load(response.data, { xmlMode: true });
-
-      const sitemapIndex = $('sitemapindex');
-      if (sitemapIndex.length > 0) {
-        sitemapIndex.find('sitemap loc').each((index, element) => {
-          stack.push($(element).text());
-        });
-      } else {
-        const maxUrls = 10; // Adjust as needed
-        $('url loc').each((index, element) => {
-          if (index >= maxUrls) return false;
-          urls.push($(element).text());
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching sitemap:', error);
+async function getUrlsFromSitemap(sitemapUrl, depth = 0) {
+  try {
+    if (depth > MAX_RECURSION_DEPTH) {
+      return [];
     }
-  }
 
-  if (depth > MAX_RECURSION_DEPTH) {
-    console.error(`Maximum recursion depth of ${MAX_RECURSION_DEPTH} exceeded for URL: ${sitemapUrl}`);
+    const response = await axios.get(sitemapUrl);
+    const $ = cheerio.load(response.data, { xmlMode: true });
+    const urls = [];
+
+    $('url > loc').each((index, element) => {
+      urls.push($(element).text());
+    });
+
+    const sitemapUrls = [];
+    $('sitemap > loc').each((index, element) => {
+      sitemapUrls.push($(element).text());
+    });
+
+    for (const sitemap of sitemapUrls) {
+      const nestedUrls = await getUrlsFromSitemap(sitemap, depth + 1);
+      urls.push(...nestedUrls);
+    }
+
+    return urls;
+  } catch (error) {
+    console.error('Error retrieving URLs from sitemap:', error);
+    return [];
   }
-  console.log(urls)
-  return urls;
 }
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
 
 app.post('/upload', upload.single('csv'), async (req, res) => {
   try {
@@ -350,7 +335,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
 });
 
 async function processRowsInParallel(rows, parentFolderId) {
-  const limit = pLimit(3); 
+  const limit = pLimit(3);
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
@@ -386,21 +371,6 @@ async function processRowsInParallel(rows, parentFolderId) {
   }));
 
   return Promise.all(promises);
-}
-
-async function getPageText(url) {
-  try {
-    const response = await axios.get(url);
-    const $ = cheerio.load(response.data);
-    $('script').remove();
-    $('style').remove();
-    const text = $('body').text();
-    const cleanedText = text.replace(/\s+/g, ' ').trim();
-    return cleanedText;
-  } catch (error) {
-    console.error('Error retrieving page text:', error);
-    return '';
-  }
 }
 
 function sendCsvResponse(res, data) {
