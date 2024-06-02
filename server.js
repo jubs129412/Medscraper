@@ -7,7 +7,7 @@ const cors = require('cors');
 const axios = require('axios').create({
   httpsAgent: new https.Agent({ rejectUnauthorized: false }),
 });
-const cheerio = require('whacko');
+const cheerio = require('cheerio');
 const multer = require('multer');
 const { OpenAI } = require('openai');
 const { convert } = require('html-to-text');
