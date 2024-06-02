@@ -392,6 +392,7 @@ async function isMedia(url) {
 
 async function getPageText(url) {
   try {
+    console.log(url)
     // Check if the URL is not a media file
     if (!(await isMedia(url))) {
       const response = await axios.get(url);
@@ -402,7 +403,7 @@ async function getPageText(url) {
       const cleanedText = text.replace(/\s+/g, ' ').trim();
       return cleanedText;
     } else {
-      console.log('The URL points to a media file.');
+      console.log(`The URL points to a media file. ${url}`);
       return '';
     }
   } catch (error) {
