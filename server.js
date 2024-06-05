@@ -2,6 +2,7 @@ const { google } = require('googleapis');
 const express = require('express');
 const https = require('https');     
 const GetSitemapLinks = require("get-sitemap-links").default;
+const sitemap = new Sitemapper();
 const csv = require('csv-parser');
 const fs = require('fs');
 const cors = require('cors');
@@ -259,34 +260,39 @@ async function scrapeLocal(url, parentFolderId) {
 
 
 async function getUrlsFromSitemap(sitemapUrl) {
-  const array = await GetSitemapLinks(sitemapUrl);
-  let urls = [];
 
-  // Function to check if URL contains certain words
-  const containsForbiddenWords = url => {
+  // Fetch the sitemap
+  let urls = [];
+  try {
+    const array = await sitemap.fetch(sitemapUrl);
+    console.log(array);
+
+    // Function to check if URL contains certain words
+    const containsForbiddenWords = url => {
       const forbiddenWords = ['mp4', 'mp3', 'png', 'jpg', 'jpeg'];
       for (const word of forbiddenWords) {
-          if (url.includes(word)) {
-              return true;
-          }
+        if (url.includes(word)) {
+          return true;
+        }
       }
       return false;
-  };
+    };
 
-  for (const url of array) {
+    for (const url of array) {
       // Check if the URL contains forbidden words
       if (!containsForbiddenWords(url)) {
-          urls.push(url);
+        urls.push(url);
       }
+    }
+
+    // Return the 10 most recent URLs if there are more than 10
+    console.log(urls.slice(0, 10));
+    return urls.slice(0, 10);
+  } catch (error) {
+    console.error('Error fetching sitemap:', error);
+    return [];
   }
-
-  // Return the 10 most recent URLs if there are more than 10
-  console.log(urls.slice(0, 10))
-  return urls.slice(0, 10);
 }
-
-
-
 
 
 app.use(express.json());
