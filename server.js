@@ -2,6 +2,7 @@ const { google } = require('googleapis');
 const express = require('express');
 const https = require('https');     
 const GetSitemapLinks = require("get-sitemap-links").default;
+const Sitemapper = require('sitemapper');
 const sitemap = new Sitemapper();
 const csv = require('csv-parser');
 const fs = require('fs');
