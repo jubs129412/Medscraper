@@ -265,7 +265,8 @@ async function getUrlsFromSitemap(sitemapUrl) {
   // Fetch the sitemap
   let urls = [];
   try {
-    const array = await sitemap.fetch(sitemapUrl);
+    let array = await sitemap.fetch(sitemapUrl);
+    array = array.sites
     console.log(array);
 
     // Function to check if URL contains certain words
