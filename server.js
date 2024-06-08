@@ -15,6 +15,7 @@ const cheerio = require('whacko');
 const multer = require('multer');
 const { OpenAI } = require('openai');
 const { convert } = require('html-to-text');
+const jsdom = require("jsdom");
 const { Parser } = require('json2csv');
 const pLimit = require('p-limit');
 require('dotenv').config();
@@ -240,12 +241,19 @@ async function generateText(text) {
 async function scrapeLocal(url, parentFolderId) {
   try {
     const response = await axios.get(url);
-    const $ = cheerio.load(response.data);
-    $('script').remove();
-    $('style').remove();
-    const text = $('body').text();
-    const cleanedText = text.replace(/\s+/g, ' ').trim();
-    const content = await generateText(cleanedText);
+    //const $ = cheerio.load(response.data);
+    //$('script').remove();
+    //$('style').remove();
+    //const text = $('body').text();
+    //const cleanedText = text.replace(/\s+/g, ' ').trim();
+    let dom = JSON.stringify(response.data)
+    dom = new JSDOM(dom,{
+     runScripts: "dangerously",
+     resources: "usable"
+   }).window.document
+   
+
+    const content = await generateText(Array.from(dom.querySelectorAll("h1, h2, h3, h4, h5, h6, p")).map((x) => x.textContent).join('\n'));
     const docLink = await createAndMoveDocument(content, url, parentFolderId);
     $.root().empty();
     return { content, docLink };
@@ -369,6 +377,7 @@ async function processRowsInParallel(rows, parentFolderId) {
       
     }
     else {
+      console.log(pageTexts.join('\n'))
       console.log("content too short! not adding")
     }
       
@@ -392,7 +401,6 @@ async function isMedia(url) {
     const response = await axios.head(url);
     const contentType = response.headers['content-type'];
     console.log(contentType)
-    // Check if the content type indicates it's not a media file
     return contentType && !contentType.startsWith('image') && !contentType.startsWith('video');
   } catch (error) {
     console.error('Error checking media type:', error);
@@ -403,15 +411,20 @@ async function isMedia(url) {
 async function getPageText(url) {
   try {
     console.log(url)
-    // Check if the URL is not a media file
     if ((await isMedia(url))) {
       const response = await axios.get(url);
-      const $ = cheerio.load(response.data);
-      $('script').remove();
-      $('style').remove();
-      const text = $('body').text();
-      const cleanedText = text.replace(/\s+/g, ' ').trim();
-      return cleanedText;
+      let dom = JSON.stringify(response.data)
+      dom = new JSDOM(dom,{
+       runScripts: "dangerously",
+       resources: "usable"
+     }).window.document
+      //const $ = cheerio.load(response.data);
+      //$('script').remove();
+      //$('style').remove();
+      //const text = $('body').text();
+      //const cleanedText = text.replace(/\s+/g, ' ').trim();
+
+      return Array.from(dom.querySelectorAll("h1, h2, h3, h4, h5, h6, p")).map((x) => x.textContent).join('\n');
     } else {
       console.log(`The URL points to a media file. ${url}`);
       return '';
