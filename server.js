@@ -16,6 +16,7 @@ const multer = require('multer');
 const { OpenAI } = require('openai');
 const { convert } = require('html-to-text');
 const jsdom = require("jsdom");
+const { JSDOM } = jsdom;
 const { Parser } = require('json2csv');
 const pLimit = require('p-limit');
 require('dotenv').config();
