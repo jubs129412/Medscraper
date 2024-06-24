@@ -416,7 +416,7 @@ async function getPageText(url) {
       const response = await axios.get(url);
       let dom = JSON.stringify(response.data)
       dom = new JSDOM(dom,{
-       runScripts: "outside-only",
+       //runScripts: "outside-only",
        resources: "usable"
      }).window.document
       //const $ = cheerio.load(response.data);
