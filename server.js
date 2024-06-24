@@ -440,7 +440,8 @@ async function getPageText(url) {
             links.forEach(link => link.parentNode.removeChild(link));
           });
         },
-      }).window.document;d(response.data);
+      }).window.document;
+      //const $ = cheerio.load(response.data);
       //$('script').remove();
       //$('style').remove();
       //const text = $('body').text();
