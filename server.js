@@ -255,12 +255,14 @@ async function scrapeLocal(url, parentFolderId) {
   try {
     const response = await axios.get(url);
     
-    // Create a JSDOM instance directly from the HTML response
+    // Create a JSDOM instance directly from the HTML response, disabling CSS processing
     const dom = new JSDOM(response.data, {
       runScripts: "outside-only", // Disable execution of all scripts
       resources: new CustomResourceLoader(), // Use custom resource loader
-      virtualConsole: new JSDOM.VirtualConsole().sendTo(console),
+      virtualConsole: 'onerror', // Use 'onerror' virtual console to suppress console errors
       pretendToBeVisual: true, // Pretend to be visual to reduce CSS parsing issues
+      includeNodeLocations: false, // Disable storing node locations to reduce memory usage
+      parsingMode: "html" // Set parsing mode to HTML only
     });
 
     // Set a memory usage limit (in bytes)
