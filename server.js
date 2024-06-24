@@ -247,7 +247,6 @@ class CustomResourceLoader extends ResourceLoader {
       console.log(`Blocked resource: ${url}`);
       return null; // Block the resource
     }
-
     return super.fetch(url, options); // Allow the resource
   }
 }
@@ -255,10 +254,10 @@ class CustomResourceLoader extends ResourceLoader {
 async function scrapeLocal(url, parentFolderId) {
   try {
     const response = await axios.get(url);
-    let domString = JSON.stringify(response.data);
-
-    const dom = new JSDOM(domString, {
-      runScripts: "dangerously",
+    
+    // Create a JSDOM instance directly from the HTML response
+    const dom = new JSDOM(response.data, {
+      runScripts: "outside-only", // Disable execution of all scripts
       resources: new CustomResourceLoader(), // Use custom resource loader
       virtualConsole: new JSDOM.VirtualConsole().sendTo(console)
     });
