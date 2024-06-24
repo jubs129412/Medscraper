@@ -428,13 +428,19 @@ async function getPageText(url) {
   try {
     console.log(url)
     if ((await isMedia(url))) {
-      const response = await axios.get(url);
-      let dom = JSON.stringify(response.data)
-      dom = new JSDOM(dom,{
-       //runScripts: "outside-only",
-       resources: "usable"
-     }).window.document
-      //const $ = cheerio.load(response.data);
+      const response = await axios.get(url, { responseType: 'text' });
+
+      const dom = new JSDOM(response.data, {
+        runScripts: 'outside-only',
+        resources: 'usable',
+        virtualConsole: new jsdom.VirtualConsole().sendTo(console, { omitJSDOMErrors: true }),
+        beforeParse(window) {
+          window.document.addEventListener('DOMContentLoaded', () => {
+            const links = window.document.querySelectorAll('link[rel="stylesheet"], style');
+            links.forEach(link => link.parentNode.removeChild(link));
+          });
+        },
+      }).window.document;d(response.data);
       //$('script').remove();
       //$('style').remove();
       //const text = $('body').text();
