@@ -249,7 +249,7 @@ async function scrapeLocal(url, parentFolderId) {
     //const cleanedText = text.replace(/\s+/g, ' ').trim();
     let dom = JSON.stringify(response.data)
     dom = new JSDOM(dom,{
-     runScripts: "dangerously",
+     //runScripts: "dangerously",
      resources: "usable"
    }).window.document
    
