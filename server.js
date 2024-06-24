@@ -454,7 +454,7 @@ async function getPageText(url) {
       dom = new JSDOM(dom,{
         runScripts: "outside-only", // Disable execution of all scripts
         resources: new CustomResourceLoader(), // Use custom resource loader
-        virtualConsole: new JSDOM.VirtualConsole().sendTo(console),
+        virtualConsole: onerror,
         pretendToBeVisual: true, // Pretend to be visual to reduce CSS parsing issues
         includeNodeLocations: false, // Disable storing node locations to reduce memory usage
         parsingMode: "html" // Set parsing mode to HTML only
