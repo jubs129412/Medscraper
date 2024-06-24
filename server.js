@@ -242,29 +242,53 @@ async function generateText(text) {
 async function scrapeLocal(url, parentFolderId) {
   try {
     const response = await axios.get(url);
-    //const $ = cheerio.load(response.data);
-    //$('script').remove();
-    //$('style').remove();
-    //const text = $('body').text();
-    //const cleanedText = text.replace(/\s+/g, ' ').trim();
-    let dom = JSON.stringify(response.data)
-    dom = new JSDOM(dom,{
-     runScripts: "dangerously",
-     resources: "usable"
-   }).window.document
-   
+    let domString = JSON.stringify(response.data);
 
-    const content = await generateText(Array.from(dom.querySelectorAll("h1, h2, h3, h4, h5, h6, p")).map((x) => x.textContent).join('\n'));
+    const dom = new JSDOM(domString, {
+      runScripts: "dangerously",
+      resources: "usable",
+      virtualConsole: new JSDOM.VirtualConsole().sendTo(console)
+    });
+
+    // Set a memory usage limit (in bytes)
+    const memoryLimit = 100 * 1024 * 1024; // 100 MB
+
+    // Function to check memory usage and throw an error if it exceeds the limit
+    function checkMemoryUsage() {
+      const usedMemory = process.memoryUsage().heapUsed;
+      if (usedMemory > memoryLimit) {
+        throw new Error(`Memory limit exceeded: ${usedMemory} bytes`);
+      }
+    }
+
+    // Periodically check memory usage
+    const memoryCheckInterval = setInterval(checkMemoryUsage, 1000);
+
+    // Wait for all resources to be loaded
+    await new Promise((resolve, reject) => {
+      dom.window.addEventListener('load', () => {
+        clearInterval(memoryCheckInterval);
+        resolve();
+      });
+      dom.window.addEventListener('error', (e) => {
+        clearInterval(memoryCheckInterval);
+        reject(e.error);
+      });
+    });
+
+    // Now you can safely interact with the DOM
+    const document = dom.window.document;
+    const content = await generateText(Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6, p")).map((x) => x.textContent).join('\n'));
     const docLink = await createAndMoveDocument(content, url, parentFolderId);
-    $.root().empty();
+
     return { content, docLink };
+
   } catch (error) {
     console.log(error);
-    $.root().empty();
-    $ = null; // Nullify Cheerio object
-  response = null; // Nullify axios response object
-  cleanedText = null; // Nullify cleaned text variable
     return { content: '', docLink: null };
+  } finally {
+    // Ensure resources are cleaned up
+    response = null; // Nullify axios response object
   }
 }
 
