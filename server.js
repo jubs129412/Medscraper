@@ -11,7 +11,7 @@ const axios = require('axios').create({
   httpsAgent: new https.Agent({ rejectUnauthorized: false }),
 });
 //const cheerio = require('cheerio');
-const cheerio = require('whacko');
+const cheerio = require('cheerio');
 const multer = require('multer');
 const { OpenAI } = require('openai');
 const { convert } = require('html-to-text');
@@ -239,70 +239,38 @@ async function generateText(text) {
   }
 }
 
-class CustomResourceLoader extends ResourceLoader {
-  fetch(url, options) {
-    // Block resources based on URL or other criteria
-    const blockedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.mp4', '.avi', '.mov', '.css'];
-    if (blockedExtensions.some(ext => url.endsWith(ext))) {
-      console.log(`Blocked resource: ${url}`);
-      return null; // Block the resource
-    }
-    return super.fetch(url, options); // Allow the resource
-  }
-}
 
 async function scrapeLocal(url, parentFolderId) {
   try {
     const response = await axios.get(url);
-    
-    // Create a JSDOM instance directly from the HTML response
-    const dom = new JSDOM(response.data, {
-      runScripts: "outside-only", // Disable execution of all scripts
-      resources: new CustomResourceLoader(), // Use custom resource loader
-      virtualConsole: new JSDOM.VirtualConsole().sendTo(console),
-      pretendToBeVisual: true, // Pretend to be visual to reduce CSS parsing issues
-      //parsingMode: "html" // Set parsing mode to HTML only
-    });
+    const $ = cheerio.load(response.data);
 
-    // Set a memory usage limit (in bytes)
-    const memoryLimit = 100 * 1024 * 1024; // 100 MB
+    // Remove unnecessary elements
+    $('script').remove();
+    $('style').remove();
 
-    // Function to check memory usage and throw an error if it exceeds the limit
-    function checkMemoryUsage() {
-      const usedMemory = process.memoryUsage().heapUsed;
-      if (usedMemory > memoryLimit) {
-        throw new Error(`Memory limit exceeded: ${usedMemory} bytes`);
-      }
-    }
+    // Extract and clean text content
+    const text = $('body').text();
+    const cleanedText = text.replace(/\s+/g, ' ').trim();
 
-    // Periodically check memory usage
-    const memoryCheckInterval = setInterval(checkMemoryUsage, 1000);
+    // Collect headings and paragraphs
+    const content = await generateText(
+      $('h1, h2, h3, h4, h5, h6, p')
+        .map((i, el) => $(el).text())
+        .get()
+        .join('\n')
+    );
 
-    // Wait for all resources to be loaded
-    await new Promise((resolve, reject) => {
-      dom.window.addEventListener('load', () => {
-        clearInterval(memoryCheckInterval);
-        resolve();
-      });
-      dom.window.addEventListener('error', (e) => {
-        clearInterval(memoryCheckInterval);
-        reject(e.error);
-      });
-    });
-
-    // Now you can safely interact with the DOM
-    const document = dom.window.document;
-    const content = await generateText(Array.from(document.querySelectorAll("h1, h2, h3, h4, h5, h6, p")).map((x) => x.textContent).join('\n'));
+    // Create document and move it
     const docLink = await createAndMoveDocument(content, url, parentFolderId);
 
-    return { content, docLink };
+    // Clean up memory
+    $.root().empty();
 
+    return { content, docLink };
   } catch (error) {
-    console.log(error);
+    console.error(error);
     return { content: '', docLink: null };
-  } finally {
-    // Ensure resources are cleaned up
-    response = null; // Nullify axios response object
   }
 }
 
