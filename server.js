@@ -452,8 +452,12 @@ async function getPageText(url) {
       const response = await axios.get(url);
       let dom = JSON.stringify(response.data)
       dom = new JSDOM(dom,{
-       runScripts: "outside-only",
-       resources: "usable"
+        runScripts: "outside-only", // Disable execution of all scripts
+        resources: new CustomResourceLoader(), // Use custom resource loader
+        virtualConsole: new JSDOM.VirtualConsole().sendTo(console),
+        pretendToBeVisual: true, // Pretend to be visual to reduce CSS parsing issues
+        includeNodeLocations: false, // Disable storing node locations to reduce memory usage
+        parsingMode: "html" // Set parsing mode to HTML only
      }).window.document
       //const $ = cheerio.load(response.data);
       //$('script').remove();
