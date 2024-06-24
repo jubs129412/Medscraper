@@ -16,7 +16,7 @@ const multer = require('multer');
 const { OpenAI } = require('openai');
 const { convert } = require('html-to-text');
 const jsdom = require("jsdom");
-const { JSDOM } = jsdom;
+const { JSDOM, ResourceLoader } = jsdom;
 const { Parser } = require('json2csv');
 const pLimit = require('p-limit');
 require('dotenv').config();
@@ -239,6 +239,19 @@ async function generateText(text) {
   }
 }
 
+class CustomResourceLoader extends ResourceLoader {
+  fetch(url, options) {
+    // Block resources based on URL or other criteria
+    const blockedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.mp4', '.avi', '.mov'];
+    if (blockedExtensions.some(ext => url.endsWith(ext))) {
+      console.log(`Blocked resource: ${url}`);
+      return null; // Block the resource
+    }
+
+    return super.fetch(url, options); // Allow the resource
+  }
+}
+
 async function scrapeLocal(url, parentFolderId) {
   try {
     const response = await axios.get(url);
@@ -246,7 +259,7 @@ async function scrapeLocal(url, parentFolderId) {
 
     const dom = new JSDOM(domString, {
       runScripts: "dangerously",
-      resources: "usable",
+      resources: new CustomResourceLoader(), // Use custom resource loader
       virtualConsole: new JSDOM.VirtualConsole().sendTo(console)
     });
 
@@ -291,7 +304,6 @@ async function scrapeLocal(url, parentFolderId) {
     response = null; // Nullify axios response object
   }
 }
-
 
 async function getUrlsFromSitemap(sitemapUrl) {
 
