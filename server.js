@@ -242,7 +242,7 @@ async function generateText(text) {
 class CustomResourceLoader extends ResourceLoader {
   fetch(url, options) {
     // Block resources based on URL or other criteria
-    const blockedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.mp4', '.avi', '.mov'];
+    const blockedExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.mp4', '.avi', '.mov', '.css'];
     if (blockedExtensions.some(ext => url.endsWith(ext))) {
       console.log(`Blocked resource: ${url}`);
       return null; // Block the resource
@@ -259,7 +259,8 @@ async function scrapeLocal(url, parentFolderId) {
     const dom = new JSDOM(response.data, {
       runScripts: "outside-only", // Disable execution of all scripts
       resources: new CustomResourceLoader(), // Use custom resource loader
-      virtualConsole: new JSDOM.VirtualConsole().sendTo(console)
+      virtualConsole: new JSDOM.VirtualConsole().sendTo(console),
+      pretendToBeVisual: true, // Pretend to be visual to reduce CSS parsing issues
     });
 
     // Set a memory usage limit (in bytes)
