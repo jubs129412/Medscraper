@@ -261,7 +261,7 @@ async function scrapeLocal(url, parentFolderId) {
       resources: new CustomResourceLoader(), // Use custom resource loader
       virtualConsole: new JSDOM.VirtualConsole().sendTo(console),
       pretendToBeVisual: true, // Pretend to be visual to reduce CSS parsing issues
-      parsingMode: "html" // Set parsing mode to HTML only
+      //parsingMode: "html" // Set parsing mode to HTML only
     });
 
     // Set a memory usage limit (in bytes)
