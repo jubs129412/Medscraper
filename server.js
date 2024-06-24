@@ -11,12 +11,12 @@ const axios = require('axios').create({
   httpsAgent: new https.Agent({ rejectUnauthorized: false }),
 });
 //const cheerio = require('cheerio');
-const cheerio = require('cheerio');
+const cheerio = require('whacko');
 const multer = require('multer');
 const { OpenAI } = require('openai');
 const { convert } = require('html-to-text');
 const jsdom = require("jsdom");
-const { JSDOM, ResourceLoader } = jsdom;
+const { JSDOM } = jsdom;
 const { Parser } = require('json2csv');
 const pLimit = require('p-limit');
 require('dotenv').config();
@@ -239,40 +239,35 @@ async function generateText(text) {
   }
 }
 
-
 async function scrapeLocal(url, parentFolderId) {
   try {
     const response = await axios.get(url);
-    const $ = cheerio.load(response.data);
+    //const $ = cheerio.load(response.data);
+    //$('script').remove();
+    //$('style').remove();
+    //const text = $('body').text();
+    //const cleanedText = text.replace(/\s+/g, ' ').trim();
+    let dom = JSON.stringify(response.data)
+    dom = new JSDOM(dom,{
+     runScripts: "dangerously",
+     resources: "usable"
+   }).window.document
+   
 
-    // Remove unnecessary elements
-    $('script').remove();
-    $('style').remove();
-
-    // Extract and clean text content
-    const text = $('body').text();
-    const cleanedText = text.replace(/\s+/g, ' ').trim();
-
-    // Collect headings and paragraphs
-    const content = await generateText(
-      $('h1, h2, h3, h4, h5, h6, p')
-        .map((i, el) => $(el).text())
-        .get()
-        .join('\n')
-    );
-
-    // Create document and move it
+    const content = await generateText(Array.from(dom.querySelectorAll("h1, h2, h3, h4, h5, h6, p")).map((x) => x.textContent).join('\n'));
     const docLink = await createAndMoveDocument(content, url, parentFolderId);
-
-    // Clean up memory
     $.root().empty();
-
     return { content, docLink };
   } catch (error) {
-    console.error(error);
+    console.log(error);
+    $.root().empty();
+    $ = null; // Nullify Cheerio object
+  response = null; // Nullify axios response object
+  cleanedText = null; // Nullify cleaned text variable
     return { content: '', docLink: null };
   }
 }
+
 
 async function getUrlsFromSitemap(sitemapUrl) {
 
@@ -421,12 +416,8 @@ async function getPageText(url) {
       const response = await axios.get(url);
       let dom = JSON.stringify(response.data)
       dom = new JSDOM(dom,{
-        runScripts: "outside-only", // Disable execution of all scripts
-        resources: new CustomResourceLoader(), // Use custom resource loader
-        virtualConsole: 'onerror',
-        pretendToBeVisual: true, // Pretend to be visual to reduce CSS parsing issues
-        includeNodeLocations: false, // Disable storing node locations to reduce memory usage
-        parsingMode: "html" // Set parsing mode to HTML only
+       runScripts: "outside-only",
+       resources: "usable"
      }).window.document
       //const $ = cheerio.load(response.data);
       //$('script').remove();
