@@ -402,7 +402,7 @@ async function isMedia(url) {
     const response = await axios.head(url);
     const contentType = response.headers['content-type'];
     console.log(contentType);
-    return contentType === 'text/html; charset=utf-8';
+    return contentType.toLowerCase() === 'text/html; charset=utf-8';
   } catch (error) {
     console.error('Error checking media type:', error);
     return false;
