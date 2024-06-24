@@ -240,31 +240,46 @@ async function generateText(text) {
 }
 
 async function scrapeLocal(url, parentFolderId) {
-  try {
-    const response = await axios.get(url);
-    //const $ = cheerio.load(response.data);
-    //$('script').remove();
-    //$('style').remove();
-    //const text = $('body').text();
-    //const cleanedText = text.replace(/\s+/g, ' ').trim();
-    let dom = JSON.stringify(response.data)
-    dom = new JSDOM(dom,{
-     //runScripts: "dangerously",
-     resources: "usable"
-   }).window.document
-   
+  let response = null;
+  let $ = null;
+  let cleanedText = null;
 
-    const content = await generateText(Array.from(dom.querySelectorAll("h1, h2, h3, h4, h5, h6, p")).map((x) => x.textContent).join('\n'));
-    const docLink = await createAndMoveDocument(content, url, parentFolderId);
+  try {
+    response = await axios.get(url);
+    $ = cheerio.load(response.data);
+
+    // Remove script and style tags
+    $('script').remove();
+    $('style').remove();
+
+    // Extract text from the body and clean it up
+    const text = $('body').text();
+    cleanedText = text.replace(/\s+/g, ' ').trim();
+
+    // Extract specific content using cheerio selectors
+    const content = Array.from($("h1, h2, h3, h4, h5, h6, p")).map((x) => $(x).text()).join('\n');
+    const generatedText = await generateText(content);
+
+    // Create and move the document
+    const docLink = await createAndMoveDocument(generatedText, url, parentFolderId);
+
+    // Clear the cheerio root
     $.root().empty();
-    return { content, docLink };
+
+    return { content: generatedText, docLink };
   } catch (error) {
     console.log(error);
-    $.root().empty();
-    $ = null; // Nullify Cheerio object
-  response = null; // Nullify axios response object
-  cleanedText = null; // Nullify cleaned text variable
+
+    if ($) {
+      $.root().empty();
+    }
+
     return { content: '', docLink: null };
+  } finally {
+    // Clear references to potentially large objects
+    response = null;
+    $ = null;
+    cleanedText = null;
   }
 }
 
