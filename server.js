@@ -228,12 +228,13 @@ async function generateText(text) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    const chatCompletion = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt + text }],
-      model: process.env.GPT_MODEL,
-    });
+    //const chatCompletion = await openai.chat.completions.create({
+      //messages: [{ role: 'user', content: prompt + text }],
+      //model: process.env.GPT_MODEL,
+    //});
     console.log("generate complete!")
-    return chatCompletion.choices[0].message.content;
+    //return chatCompletion.choices[0].message.content;
+    return 'test'
   } catch (error) {
     console.log(error);
     return '';
