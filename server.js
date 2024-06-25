@@ -401,16 +401,14 @@ async function processRowsInParallel(rows, parentFolderId) {
           return text
         })
       );
-      if (pageTexts.join('\n').length > 10000) {
-        console.log("pageTexts exceeds 10,000 characters. Truncating...");
-        pageTexts = pageTexts.slice(0, 10000); // Limit to first 10,000 characters
-    }
-    
-    if (pageTexts.join('\n').length > 100) {
-        var content = await generateText(pageTexts.join('\n'));
-        console.log("Generate complete pre doclink!");
-        var docLink = await createAndMoveDocument(content, url, parentFolderId);
-    }
+      if (pageTexts.join('\n').length > 100){
+        pageTexts = pageTexts.join('\n')
+        if (pageTexts.length > 10000) {
+        pageTexts = pageTexts.slice(0, 10000);
+        }
+      var content = await generateText(pageTexts.join('\n'));
+      console.log("generate complete pre doclink!")
+      var docLink = await createAndMoveDocument(content, url, parentFolderId);
       
     }
     else {
