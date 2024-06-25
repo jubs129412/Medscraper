@@ -285,12 +285,11 @@ async function scrapeLocal(url, parentFolderId) {
 
 
 async function getUrlsFromSitemap(sitemapUrl) {
-
   // Fetch the sitemap
   let urls = [];
   try {
     let array = await sitemap.fetch(sitemapUrl);
-    array = array.sites
+    array = array.sites;
     console.log(array);
 
     // Function to check if URL contains certain words
@@ -312,13 +311,23 @@ async function getUrlsFromSitemap(sitemapUrl) {
     }
 
     // Return the 10 most recent URLs if there are more than 10
-    console.log(urls.slice(0, 10));
-    return urls.slice(0, 10);
+    const result = urls.slice(0, 10);
+    console.log(result);
+
+    // Return home URL if no valid URLs are found
+    if (result.length === 0) {
+      const homeUrl = new URL(sitemapUrl).origin;
+      console.log([homeUrl]);
+      return [homeUrl];
+    }
+
+    return result;
   } catch (error) {
     console.error('Error fetching sitemap:', error);
     return [];
   }
 }
+
 
 
 app.use(express.json());
