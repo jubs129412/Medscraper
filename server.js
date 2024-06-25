@@ -163,6 +163,7 @@ async function makeFolderPublic(folderId) {
 }
 
 async function createAndMoveDocument(content, url, parentFolderId) {
+  console.log("testing?")
   const createDocument = async () => {
     const auth = new google.auth.GoogleAuth({
       credentials: credentials,
@@ -228,13 +229,12 @@ async function generateText(text) {
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    //const chatCompletion = await openai.chat.completions.create({
-      //messages: [{ role: 'user', content: prompt + text }],
-      //model: process.env.GPT_MODEL,
-    //});
+    const chatCompletion = await openai.chat.completions.create({
+      messages: [{ role: 'user', content: prompt + text }],
+      model: process.env.GPT_MODEL,
+    });
     console.log("generate complete!")
-    //return chatCompletion.choices[0].message.content;
-    return 'test'
+    return chatCompletion.choices[0].message.content;
   } catch (error) {
     console.log(error);
     return '';
@@ -401,10 +401,16 @@ async function processRowsInParallel(rows, parentFolderId) {
           return text
         })
       );
-      if (pageTexts.join('\n').length > 100){
-      var content = await generateText(pageTexts.join('\n'));
-      console.log("generate complete pre doclink!")
-      var docLink = await createAndMoveDocument(content, url, parentFolderId);
+      if (pageTexts.join('\n').length > 10000) {
+        console.log("pageTexts exceeds 10,000 characters. Truncating...");
+        pageTexts = pageTexts.slice(0, 10000); // Limit to first 10,000 characters
+    }
+    
+    if (pageTexts.join('\n').length > 100) {
+        var content = await generateText(pageTexts.join('\n'));
+        console.log("Generate complete pre doclink!");
+        var docLink = await createAndMoveDocument(content, url, parentFolderId);
+    }
       
     }
     else {
