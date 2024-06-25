@@ -406,7 +406,7 @@ async function processRowsInParallel(rows, parentFolderId) {
         if (pageTexts.length > 10000) {
         pageTexts = pageTexts.slice(0, 10000);
         }
-      var content = await generateText(pageTexts);
+      //var content = await generateText(pageTexts);
       console.log("generate complete pre doclink!")
       //var docLink = await createAndMoveDocument(content, url, parentFolderId);
       
