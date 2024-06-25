@@ -408,7 +408,7 @@ async function processRowsInParallel(rows, parentFolderId) {
         }
       var content = await generateText(pageTexts);
       console.log("generate complete pre doclink!")
-      var docLink = await createAndMoveDocument(content, url, parentFolderId);
+      //var docLink = await createAndMoveDocument(content, url, parentFolderId);
       
     }
     else {
