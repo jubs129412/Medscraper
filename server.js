@@ -385,7 +385,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
 
 async function processRowsInParallel(rows, parentFolderId) {
  
-  const limit = pLimit(1); 
+  const limit = pLimit(2); 
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
