@@ -388,7 +388,10 @@ async function processRowsInParallel(rows, parentFolderId) {
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
-
+    if (url === 'https://www.triadctv.com/') {
+      console.log(`Skipping URL: ${url}`);
+      return { ...row, doc_link: null };  // Adjust as needed for your use case
+    }
     if (all_pages === 'yes') {
       let pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
       if (pages.length === 0) {
@@ -407,7 +410,6 @@ async function processRowsInParallel(rows, parentFolderId) {
         if (pageTexts.length > 10000) {
         pageTexts = pageTexts.slice(0, 10000);
         }
-        pageTexts = "test site"
       var content = await generateText(pageTexts);
       console.log("generate complete pre doclink!")
       var docLink = await createAndMoveDocument(content, url, parentFolderId);
