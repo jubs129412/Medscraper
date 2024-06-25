@@ -224,6 +224,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
 }
 
 async function generateText(text) {
+  console.log("begin generate!")
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
