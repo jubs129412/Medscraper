@@ -384,10 +384,23 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
 });
 
 async function processRowsInParallel(rows, parentFolderId) {
+ 
   const limit = pLimit(1); 
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
+    try{
+    const response = await axios.get(url);
+    if (response.status === 200) {
+      console.log(`${url} is live`);
+    } else {
+      return { ...row, doc_link: null };
+    }
+  }catch (error) {
+    if (error.response) {
+      // Request made and server responded
+      return { ...row, doc_link: null };
+    }}
     if (url === 'https://www.triadctv.com/') {
       console.log(`Skipping URL: ${url}`);
       return { ...row, doc_link: null };  // Adjust as needed for your use case
@@ -434,6 +447,7 @@ async function processRowsInParallel(rows, parentFolderId) {
 
   return Promise.all(promises);
 }
+
 
 async function isMedia(url) {
   try {
