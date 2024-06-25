@@ -394,7 +394,8 @@ async function processRowsInParallel(rows, parentFolderId) {
         pages.map(async (page) => {
           const text = await getPageText(page);
           console.log(text)
-          return convert(text, options);
+          //return convert(text, options);
+          return text
         })
       );
       if (pageTexts.join('\n').length > 100){
@@ -451,12 +452,6 @@ async function getPageText(url) {
           });
         },
       }).window.document;
-      //const $ = cheerio.load(response.data);
-      //$('script').remove();
-      //$('style').remove();
-      //const text = $('body').text();
-      //const cleanedText = text.replace(/\s+/g, ' ').trim();
-
       return Array.from(dom.querySelectorAll("h1, h2, h3, h4, h5, h6, p")).map((x) => x.textContent).join('\n');
     } else {
       console.log(`The URL points to a media file. ${url}`);
