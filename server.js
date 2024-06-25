@@ -418,7 +418,7 @@ async function processRowsInParallel(rows, parentFolderId) {
       
 
       console.log(`${url} - all pages`);
-      return { ...row, doc_link: docLink };
+      //return { ...row, doc_link: docLink };
     } else if (all_pages === 'no') {
       const { content, docLink } = await scrapeLocal(url, parentFolderId);
       return { ...row, doc_link: docLink };
