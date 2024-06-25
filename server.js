@@ -355,6 +355,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
           if (newFolderId) {
             await makeFolderPublic(newFolderId);
             const processedResults = await processRowsInParallel(results, newFolderId);
+            console.log("postproc")
             await uploadCsvToDrive(newFolderId, fileName, processedResults);
           } else {
             res.status(500).send('Error creating new folder.');
