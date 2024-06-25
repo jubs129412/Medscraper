@@ -393,6 +393,7 @@ async function processRowsInParallel(rows, parentFolderId) {
       const pageTexts = await Promise.all(
         pages.map(async (page) => {
           const text = await getPageText(page);
+          console.log(text)
           return convert(text, options);
         })
       );
