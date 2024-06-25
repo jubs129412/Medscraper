@@ -232,7 +232,7 @@ async function generateText(text) {
       messages: [{ role: 'user', content: prompt + text }],
       model: process.env.GPT_MODEL,
     });
-
+    console.log("generate complete!")
     return chatCompletion.choices[0].message.content;
   } catch (error) {
     console.log(error);
@@ -260,6 +260,7 @@ async function scrapeLocal(url, parentFolderId) {
     // Extract specific content using cheerio selectors
     const content = Array.from($("h1, h2, h3, h4, h5, h6, p")).map((x) => $(x).text()).join('\n');
     const generatedText = await generateText(content);
+    console.log("generate complete after call!")
 
     // Create and move the document
     const docLink = await createAndMoveDocument(generatedText, url, parentFolderId);
@@ -401,6 +402,7 @@ async function processRowsInParallel(rows, parentFolderId) {
       );
       if (pageTexts.join('\n').length > 100){
       var content = await generateText(pageTexts.join('\n'));
+      console.log("generate complete pre doclink!")
       var docLink = await createAndMoveDocument(content, url, parentFolderId);
       
     }
