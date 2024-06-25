@@ -384,7 +384,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
 });
 
 async function processRowsInParallel(rows, parentFolderId) {
-  const limit = pLimit(3); 
+  const limit = pLimit(1); 
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
@@ -407,9 +407,9 @@ async function processRowsInParallel(rows, parentFolderId) {
         if (pageTexts.length > 10000) {
         pageTexts = pageTexts.slice(0, 10000);
         }
-      //var content = await generateText(pageTexts);
+      var content = await generateText(pageTexts);
       console.log("generate complete pre doclink!")
-      //var docLink = await createAndMoveDocument(content, url, parentFolderId);
+      var docLink = await createAndMoveDocument(content, url, parentFolderId);
       
     }
     else {
@@ -419,7 +419,7 @@ async function processRowsInParallel(rows, parentFolderId) {
       
 
       console.log(`${url} - all pages`);
-      //return { ...row, doc_link: docLink };
+      return { ...row, doc_link: docLink };
     } else if (all_pages === 'no') {
       const { content, docLink } = await scrapeLocal(url, parentFolderId);
       return { ...row, doc_link: docLink };
