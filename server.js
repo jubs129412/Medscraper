@@ -411,15 +411,19 @@ async function processRowsInParallel(rows, parentFolderId) {
         pages = [url];
       }
       
-      let pageTexts = await Promise.all(
-        pages.map(async (page, index) => { // Add 'index' here
-          console.log(`Running getPageText for index: ${index}`);
+      let pageTexts = [];
+
+      for (const [index, page] of pages.entries()) {
+        console.log(`Running getPageText for index: ${index}`);
+        try {
           const text = await getPageText(page);
           console.log(text);
-          // return convert(text, options);
-          return text;
-        })
-      );
+          pageTexts.push(text);
+        } catch (error) {
+          console.error(`Failed to get text for ${page} at index ${index}`, error);
+        }
+      }
+      
       console.log("heap beofre")
       if (pageTexts.join('\n').length > 100){
         pageTexts = pageTexts.join('\n')
