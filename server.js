@@ -410,12 +410,14 @@ async function processRowsInParallel(rows, parentFolderId) {
       if (pages.length === 0) {
         pages = [url];
       }
+      
       let pageTexts = await Promise.all(
-        pages.map(async (page) => {
+        pages.map(async (page, index) => { // Add 'index' here
+          console.log(`Running getPageText for index: ${index}`);
           const text = await getPageText(page);
-          console.log(text)
-          //return convert(text, options);
-          return text
+          console.log(text);
+          // return convert(text, options);
+          return text;
         })
       );
       if (pageTexts.join('\n').length > 100){
