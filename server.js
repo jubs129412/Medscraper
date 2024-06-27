@@ -472,6 +472,7 @@ async function getPageText(url) {
     if ((await isMedia(url))) {
       const response = await axios.get(url, { responseType: 'text' });
       console.log("page recieved")
+      console.log("Page received, response size:", response.data.length);
       const dom = new JSDOM(response.data, {
         runScripts: 'outside-only',
         resources: 'usable',
