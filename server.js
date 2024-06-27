@@ -420,11 +420,13 @@ async function processRowsInParallel(rows, parentFolderId) {
           return text;
         })
       );
+      console.log("heap beofre")
       if (pageTexts.join('\n').length > 100){
         pageTexts = pageTexts.join('\n')
         if (pageTexts.length > 10000) {
         pageTexts = pageTexts.slice(0, 10000);
         }
+        console.log("heap")
       var content = await generateText(pageTexts);
       console.log("generate complete pre doclink!")
       var docLink = await createAndMoveDocument(content, url, parentFolderId);
