@@ -423,13 +423,10 @@ async function processRowsInParallel(rows, parentFolderId) {
           console.error(`Failed to get text for ${page} at index ${index}`, error);
         }
       }
-      
+
       console.log("heap beofre")
       if (pageTexts.join('\n').length > 100){
         pageTexts = pageTexts.join('\n')
-        if (pageTexts.length > 10000) {
-        pageTexts = pageTexts.slice(0, 10000);
-        }
         console.log("heap")
       var content = await generateText(pageTexts);
       console.log("generate complete pre doclink!")
@@ -474,7 +471,7 @@ async function getPageText(url) {
     console.log(url)
     if ((await isMedia(url))) {
       const response = await axios.get(url, { responseType: 'text' });
-
+      console.log("page recieved")
       const dom = new JSDOM(response.data, {
         runScripts: 'outside-only',
         resources: 'usable',
