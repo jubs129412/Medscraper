@@ -483,6 +483,7 @@ async function getPageText(url) {
           });
         },
       }).window.document;
+      console.log('presave')
       return Array.from(dom.querySelectorAll("h1, h2, h3, h4, h5, h6, p")).map((x) => x.textContent).join('\n');
     } else {
       console.log(`The URL points to a media file. ${url}`);
