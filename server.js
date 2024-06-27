@@ -471,8 +471,16 @@ async function getPageText(url) {
     console.log(url)
     if ((await isMedia(url))) {
       const response = await axios.get(url, { responseType: 'text' });
-      console.log("page recieved")
       console.log("Page received, response size:", response.data.length);
+
+      const responseSizeInMB = response.data.length / (1024 * 1024);
+
+      if (responseSizeInMB > 5) {
+        console.log(`Page size exceeds 5MB (${responseSizeInMB.toFixed(2)} MB). Returning empty string.`);
+        return '';
+      }
+      
+      console.log("page recieved")
       const dom = new JSDOM(response.data, {
         runScripts: 'outside-only',
         resources: 'usable',
