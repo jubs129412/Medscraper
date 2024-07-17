@@ -163,7 +163,6 @@ async function makeFolderPublic(folderId) {
 }
 
 async function createAndMoveDocument(content, url, parentFolderId) {
-  console.log("testing?")
   const createDocument = async () => {
     const auth = new google.auth.GoogleAuth({
       credentials: credentials,
@@ -174,7 +173,6 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     });
 
     const authClient = await auth.getClient();
-
     const docs = google.docs({ version: 'v1', auth: authClient });
     const drive = google.drive({ version: 'v3', auth: authClient });
 
@@ -187,19 +185,88 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     const documentId = docCreationResponse.data.documentId;
     console.log(`Created document with ID: ${documentId}`);
 
+    const lines = content.split('\n');
+    const requests = [];
+    let inBold = false;
+    let boldText = '';
+    let startBoldIndex = 1;  // To track the start index of the bold text
+
+    for (const line of lines) {
+      if (line.startsWith('# ')) {
+        // Heading 1
+        requests.push({
+          insertText: {
+            location: {
+              index: 1,
+            },
+            text: line.replace('# ', '') + '\n',
+          },
+        });
+        requests.push({
+          updateParagraphStyle: {
+            range: {
+              startIndex: 1,
+              endIndex: line.length + 1,
+            },
+            paragraphStyle: {
+              namedStyleType: 'HEADING_1',
+            },
+            fields: 'namedStyleType',
+          },
+        });
+      } else if (line.startsWith('**') || inBold) {
+        // Bold text
+        if (!inBold) {
+          startBoldIndex = 1;  // Set start index of bold text
+          boldText += line.replace('**', '') + ' ';
+          inBold = true;
+        } else {
+          boldText += line + ' ';
+          if (line.endsWith('**')) {
+            inBold = false;
+            boldText = boldText.replace('**', '').trim();
+            const endBoldIndex = startBoldIndex + boldText.length;
+
+            requests.push({
+              insertText: {
+                location: {
+                  index: startBoldIndex,
+                },
+                text: boldText + '\n',
+              },
+            });
+            requests.push({
+              updateTextStyle: {
+                range: {
+                  startIndex: startBoldIndex,
+                  endIndex: endBoldIndex,
+                },
+                textStyle: {
+                  bold: true,
+                },
+                fields: 'bold',
+              },
+            });
+            boldText = '';
+          }
+        }
+      } else {
+        // Regular text
+        requests.push({
+          insertText: {
+            location: {
+              index: 1,
+            },
+            text: line + '\n',
+          },
+        });
+      }
+    }
+
     await docs.documents.batchUpdate({
       documentId: documentId,
       requestBody: {
-        requests: [
-          {
-            insertText: {
-              location: {
-                index: 1,
-              },
-              text: content,
-            },
-          },
-        ],
+        requests: requests.reverse(),  // Reverse the requests to apply them in correct order
       },
     });
 
@@ -223,6 +290,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     return null;
   }
 }
+
 
 async function generateText(text) {
   console.log("begin generate!")
