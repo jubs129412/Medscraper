@@ -186,20 +186,71 @@ async function createAndMoveDocument(content, url, parentFolderId) {
 
     const documentId = docCreationResponse.data.documentId;
     console.log(`Created document with ID: ${documentId}`);
+    const lines = content.split('\n');
+    const requests = [];
+    for (const line of lines) {
+      let request = null;
+      if (line.startsWith('#### ')) {
+        request = {
+          insertText: {
+            location: {
+              index: requests.length + 1,
+            },
+            text: line.replace('#### ', '') + '\n',
+          },
+        };
+        requests.push(request);
+        request = {
+          updateParagraphStyle: {
+            range: {
+              startIndex: requests.length - 1,
+              endIndex: requests.length,
+            },
+            paragraphStyle: {
+              namedStyleType: 'HEADING_4',
+            },
+            fields: 'namedStyleType',
+          },
+        };
+      } else if (line.startsWith('### ')) {
+        request = {
+          insertText: {
+            location: {
+              index: requests.length + 1,
+            },
+            text: line.replace('### ', '') + '\n',
+          },
+        };
+        requests.push(request);
+        request = {
+          updateParagraphStyle: {
+            range: {
+              startIndex: requests.length - 1,
+              endIndex: requests.length,
+            },
+            paragraphStyle: {
+              namedStyleType: 'HEADING_3',
+            },
+            fields: 'namedStyleType',
+          },
+        };
+      } else {
+        request = {
+          insertText: {
+            location: {
+              index: requests.length + 1,
+            },
+            text: line + '\n',
+          },
+        };
+      }
+      requests.push(request);
+    }
 
     await docs.documents.batchUpdate({
       documentId: documentId,
       requestBody: {
-        requests: [
-          {
-            insertText: {
-              location: {
-                index: 1,
-              },
-              text: content,
-            },
-          },
-        ],
+        requests: requests,
       },
     });
 
