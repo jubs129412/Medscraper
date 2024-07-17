@@ -163,7 +163,7 @@ async function makeFolderPublic(folderId) {
 }
 
 async function createAndMoveDocument(content, url, parentFolderId) {
-  console.log("testing?")
+  console.log("testing?");
   const createDocument = async () => {
     const auth = new google.auth.GoogleAuth({
       credentials: credentials,
@@ -174,7 +174,6 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     });
 
     const authClient = await auth.getClient();
-
     const docs = google.docs({ version: 'v1', auth: authClient });
     const drive = google.drive({ version: 'v3', auth: authClient });
 
@@ -186,25 +185,31 @@ async function createAndMoveDocument(content, url, parentFolderId) {
 
     const documentId = docCreationResponse.data.documentId;
     console.log(`Created document with ID: ${documentId}`);
+
     const lines = content.split('\n');
     const requests = [];
+
+    let index = 1; // Start index at 1 to avoid the initial section break
+
     for (const line of lines) {
       let request = null;
       if (line.startsWith('#### ')) {
         request = {
           insertText: {
             location: {
-              index: requests.length + 1,
+              index: index,
             },
             text: line.replace('#### ', '') + '\n',
           },
         };
         requests.push(request);
+        index += line.replace('#### ', '').length + 1;
+
         request = {
           updateParagraphStyle: {
             range: {
-              startIndex: requests.length - 1,
-              endIndex: requests.length,
+              startIndex: index - (line.replace('#### ', '').length + 1),
+              endIndex: index,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_4',
@@ -216,17 +221,19 @@ async function createAndMoveDocument(content, url, parentFolderId) {
         request = {
           insertText: {
             location: {
-              index: requests.length + 1,
+              index: index,
             },
             text: line.replace('### ', '') + '\n',
           },
         };
         requests.push(request);
+        index += line.replace('### ', '').length + 1;
+
         request = {
           updateParagraphStyle: {
             range: {
-              startIndex: requests.length - 1,
-              endIndex: requests.length,
+              startIndex: index - (line.replace('### ', '').length + 1),
+              endIndex: index,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_3',
@@ -238,11 +245,13 @@ async function createAndMoveDocument(content, url, parentFolderId) {
         request = {
           insertText: {
             location: {
-              index: requests.length + 1,
+              index: index,
             },
             text: line + '\n',
           },
         };
+        requests.push(request);
+        index += line.length + 1;
       }
       requests.push(request);
     }
@@ -274,6 +283,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     return null;
   }
 }
+
 
 async function generateText(text) {
   console.log("begin generate!")
