@@ -283,7 +283,15 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     return null;
   }
 }
-
+const logMemoryUsage = () => {
+  const memoryUsage = process.memoryUsage();
+  console.log('Memory Usage:');
+  console.log(`RSS: ${memoryUsage.rss / 1024 / 1024} MB`);
+  console.log(`Heap Total: ${memoryUsage.heapTotal / 1024 / 1024} MB`);
+  console.log(`Heap Used: ${memoryUsage.heapUsed / 1024 / 1024} MB`);
+  console.log(`External: ${memoryUsage.external / 1024 / 1024} MB`);
+  console.log(`Array Buffers: ${memoryUsage.arrayBuffers / 1024 / 1024} MB`);
+};
 
 async function generateText(text) {
   console.log("begin generate!")
@@ -484,6 +492,7 @@ async function processRowsInParallel(rows, parentFolderId) {
           console.error(`Failed to get text for ${page} at index ${index}`, error);
         }
       }
+      logMemoryUsage();
 
       console.log("heap beofre")
       if (pageTexts.join('\n').length > 100){
@@ -491,6 +500,7 @@ async function processRowsInParallel(rows, parentFolderId) {
         console.log("heap")
       var content = await generateText(pageTexts);
       console.log("generate complete pre doclink!")
+      logMemoryUsage();
       var docLink = await createAndMoveDocument(content, url, parentFolderId);
       
     }
@@ -530,17 +540,20 @@ async function isMedia(url) {
 async function getPageText(url) {
   try {
     console.log(url)
+    logMemoryUsage();
     if ((await isMedia(url))) {
       const response = await axios.get(url, { responseType: 'text' });
       console.log("Page received, response size:", response.data.length);
 
       const responseSizeInMB = response.data.length / (1024 * 1024);
+      logMemoryUsage();
 
       if (responseSizeInMB > 5) {
         console.log(`Page size exceeds 5MB (${responseSizeInMB.toFixed(2)} MB). Returning empty string.`);
         return '';
       }
-      
+      logMemoryUsage();
+
       console.log("page recieved")
       const dom = new JSDOM(response.data, {
         runScripts: 'outside-only',
