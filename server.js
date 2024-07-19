@@ -358,61 +358,33 @@ async function scrapeLocal(url, parentFolderId) {
 
 
 async function getUrlsFromSitemap(sitemapUrl) {
-  let urls = [];
-  try {
-    let array = await sitemap.fetch(sitemapUrl);
-    array = array.sites;
-    console.log(array);
+  return new Promise((resolve, reject) => {
+    const worker = fork('./sitemap.js');
+      
+    worker.on('message', async (urls) => {
+      resolve(urls);
+      worker.kill();
+      global.gc();global.gc();global.gc();global.gc();global.gc();
+      await new Promise(resolve => setTimeout(resolve, 500));
+    });
 
-    // Function to check if URL contains certain words
-    const containsForbiddenWords = url => {
-      const forbiddenWords = ['mp4', 'mp3', 'png', 'jpg', 'jpeg'];
-      for (const word of forbiddenWords) {
-        if (url.includes(word)) {
-          return true;
-        }
+    worker.on('error', async (error) => {
+      worker.kill();
+      global.gc();global.gc();global.gc();global.gc();global.gc();
+      await new Promise(resolve => setTimeout(resolve, 500));
+      return []; // Returning an empty string on rejection
+    });
+
+    worker.on('exit', async (code) => {
+      if (code !== 0) {
+        global.gc();global.gc();global.gc();global.gc();global.gc();
+        await new Promise(resolve => setTimeout(resolve, 500));
+        return []; // Returning an empty string on rejection
       }
-      return false;
-    };
+    });
 
-    for (const url of array) {
-      // Check if the URL contains forbidden words
-      if (!containsForbiddenWords(url)) {
-        urls.push(url);
-      }
-    }
-
-    // Return the 10 most recent URLs if there are more than 10
-    const result = urls.slice(0, 10);
-    console.log(result);
-
-    // Clear memory by setting arrays to null when done
-    array = null;
-    urls = null;
-    if (global.gc) {
-      console.log("cleaning")
-      global.gc();
-      global.gc();
-      global.gc();
-      global.gc();
-      global.gc();
-      console.log("cleaned")
-    }
-
-    // Wait for 500ms to ensure garbage collection has taken place
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // Return home URL if no valid URLs are found
-    if (result.length === 0) {
-      const homeUrl = new URL(sitemapUrl).origin;
-      console.log([homeUrl]);
-      return [homeUrl];
-    }
-
-    return result;
-  } catch (error) {
-    console.error('Error fetching sitemap:', error);
-    return [];
-  }
+    worker.send(sitemapUrl);
+  });
 }
 
 
