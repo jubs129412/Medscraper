@@ -499,8 +499,6 @@ async function processRowsInParallel(rows, parentFolderId) {
       console.log(pageTexts.join('\n'))
       console.log("content too short! not adding")
     }
-    logHeapSnapshot();
-    writeHeapSnapshot();
       console.log(`${url} - all pages`);
       return { ...row, doc_link: docLink };
     } else if (all_pages === 'no') {
