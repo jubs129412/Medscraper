@@ -1,4 +1,5 @@
 const { google } = require('googleapis');
+const v8 = require('v8');
 const express = require('express');
 const https = require('https');     
 const GetSitemapLinks = require("get-sitemap-links").default;
@@ -402,7 +403,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
     if (req.file) {
       const filePath = req.file.path;
       const fileName = req.file.originalname.split('.').slice(0, -1).join('.');
-      fs.createReadStream(filePath)
+      fs.createReadStream(filePath, {highWaterMark: 1024})
         .pipe(csv())
         .on('data', (row) => {
           results.push(row);
@@ -484,19 +485,16 @@ async function processRowsInParallel(rows, parentFolderId) {
       console.log(pageTexts.join('\n'))
       console.log("content too short! not adding")
     }
-      
-
+    const heapSnapshot = v8.getHeapSnapshot(); 
+    console.log('Heap snapshot:', heapSnapshot);
       console.log(`${url} - all pages`);
-      //return { ...row, doc_link: docLink };
-      return ''
+      return { ...row, doc_link: docLink };
     } else if (all_pages === 'no') {
       const { content, docLink } = await scrapeLocal(url, parentFolderId);
-      //return { ...row, doc_link: docLink };
-      return ''
+      return { ...row, doc_link: docLink };
     } else {
       console.log(`Invalid value for "all_pages" for URL: ${url}`);
-      //return { ...row, doc_link: null };
-      return ''
+      return { ...row, doc_link: null };
     }
   }));
 
