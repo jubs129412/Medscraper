@@ -339,7 +339,8 @@ async function scrapeLocal(url, parentFolderId) {
     // Clear the cheerio root
     $.root().empty();
 
-    return { content: generatedText, docLink };
+    //return { content: generatedText, docLink };
+    return ''
   } catch (error) {
     console.log(error);
 
@@ -347,7 +348,9 @@ async function scrapeLocal(url, parentFolderId) {
       $.root().empty();
     }
 
-    return { content: '', docLink: null };
+    //return { content: '', docLink: null };
+    return ''
+
   } finally {
     // Clear references to potentially large objects
     response = null;
@@ -413,7 +416,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
             await makeFolderPublic(newFolderId);
             const processedResults = await processRowsInParallel(results, newFolderId);
             console.log("postproc")
-            await uploadCsvToDrive(newFolderId, fileName, processedResults);
+            //await uploadCsvToDrive(newFolderId, fileName, processedResults);
           } else {
             res.status(500).send('Error creating new folder.');
           }
@@ -484,13 +487,16 @@ async function processRowsInParallel(rows, parentFolderId) {
       
 
       console.log(`${url} - all pages`);
-      return { ...row, doc_link: docLink };
+      //return { ...row, doc_link: docLink };
+      return ''
     } else if (all_pages === 'no') {
       const { content, docLink } = await scrapeLocal(url, parentFolderId);
-      return { ...row, doc_link: docLink };
+      //return { ...row, doc_link: docLink };
+      return ''
     } else {
       console.log(`Invalid value for "all_pages" for URL: ${url}`);
-      return { ...row, doc_link: null };
+      //return { ...row, doc_link: null };
+      return ''
     }
   }));
 
