@@ -544,15 +544,18 @@ function getPageText(url) {
     worker.on('message', (pageText) => {
       resolve(pageText);
       worker.kill();
+      global.gc();
     });
 
     worker.on('error', (error) => {
       worker.kill();
+      global.gc();
       return ''; // Returning an empty string on rejection
     });
 
     worker.on('exit', (code) => {
       if (code !== 0) {
+        global.gc();
         return ''; // Returning an empty string on rejection
       }
     });
