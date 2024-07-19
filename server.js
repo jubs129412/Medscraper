@@ -459,22 +459,7 @@ async function processRowsInParallel(rows, parentFolderId) {
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
-    try{
-    const response = await axios.get(url);
-    if (response.status === 200) {
-      console.log(`${url} is live`);
-    } else {
-      return { ...row, doc_link: null };
-    }
-  }catch (error) {
-    if (error.response) {
-      // Request made and server responded
-      return { ...row, doc_link: null };
-    }}
-    if (url === 'https://www.triadctv.com/') {
-      console.log(`Skipping URL: ${url}`);
-      return { ...row, doc_link: null };  // Adjust as needed for your use case
-    }
+
     if (all_pages === 'yes') {
       let pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
       if (pages.length === 0) {
