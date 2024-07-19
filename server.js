@@ -541,21 +541,24 @@ function getPageText(url) {
   return new Promise((resolve, reject) => {
     const worker = fork('./worker.js');
       
-    worker.on('message', (pageText) => {
+    worker.on('message', async (pageText) => {
       resolve(pageText);
       worker.kill();
-      global.gc();
+      global.gc();global.gc();global.gc();global.gc();global.gc();
+      await new Promise(resolve => setTimeout(resolve, 500));
     });
 
-    worker.on('error', (error) => {
+    worker.on('error', async (error) => {
       worker.kill();
-      global.gc();
+      global.gc();global.gc();global.gc();global.gc();global.gc();
+      await new Promise(resolve => setTimeout(resolve, 500));
       return ''; // Returning an empty string on rejection
     });
 
-    worker.on('exit', (code) => {
+    worker.on('exit', async (code) => {
       if (code !== 0) {
-        global.gc();
+        global.gc();global.gc();global.gc();global.gc();global.gc();
+        await new Promise(resolve => setTimeout(resolve, 500));
         return ''; // Returning an empty string on rejection
       }
     });
