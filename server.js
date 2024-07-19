@@ -7,6 +7,7 @@ const sitemap = new Sitemapper();
 const csv = require('csv-parser');
 const fs = require('fs');
 const cors = require('cors');
+const { fork } = require('child_process');
 const axios = require('axios').create({
   httpsAgent: new https.Agent({ rejectUnauthorized: false }),
 });
@@ -536,8 +537,30 @@ async function isMedia(url) {
     return false;
   }
 }
+function getPageText(url) {
+  return new Promise((resolve, reject) => {
+    const worker = fork('./worker.js');
+      
+    worker.on('message', (pageText) => {
+      resolve(pageText);
+      worker.kill();
+    });
 
-async function getPageText(url) {
+    worker.on('error', (error) => {
+      worker.kill();
+      return ''; // Returning an empty string on rejection
+    });
+
+    worker.on('exit', (code) => {
+      if (code !== 0) {
+        return ''; // Returning an empty string on rejection
+      }
+    });
+
+    worker.send(url);
+  });
+}
+async function getPageText2(url) {
   try {
     console.log(url)
     logMemoryUsage();
@@ -563,6 +586,7 @@ async function getPageText(url) {
           window.document.addEventListener('DOMContentLoaded', () => {
             const links = window.document.querySelectorAll('link[rel="stylesheet"], style');
             links.forEach(link => link.parentNode.removeChild(link));
+            window.close();
           });
         },
       }).window.document;
