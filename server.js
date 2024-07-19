@@ -487,7 +487,7 @@ async function processRowsInParallel(rows, parentFolderId) {
         console.log(`Running getPageText for index: ${index}`);
         try {
           const text = await getPageText(page);
-          console.log(text);
+          //console.log(text);
           pageTexts.push(text);
         } catch (error) {
           console.error(`Failed to get text for ${page} at index ${index}`, error);
@@ -495,10 +495,10 @@ async function processRowsInParallel(rows, parentFolderId) {
       }
       logMemoryUsage();
 
-      console.log("heap beofre")
+      console.log("joining")
       if (pageTexts.join('\n').length > 100){
         pageTexts = pageTexts.join('\n')
-        console.log("heap")
+        console.log("pre gentext")
       var content = await generateText(pageTexts);
       console.log("generate complete pre doclink!")
       logMemoryUsage();
