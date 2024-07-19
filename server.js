@@ -443,7 +443,21 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
     res.status(500).send('Internal Server Error');
   }
 });
+function writeHeapSnapshot() {
+  const snapshotStream = v8.getHeapSnapshot();
+  const fileName = `heap-${Date.now()}.heapsnapshot`;
+  const writeStream = fs.createWriteStream(fileName);
+  
+  snapshotStream.pipe(writeStream);
 
+  writeStream.on('finish', () => {
+    console.log(`Heap snapshot written to ${fileName}`);
+  });
+
+  writeStream.on('error', (err) => {
+    console.error('Error writing heap snapshot:', err);
+  });
+}
 async function processRowsInParallel(rows, parentFolderId) {
  
   const limit = pLimit(15); 
@@ -485,8 +499,8 @@ async function processRowsInParallel(rows, parentFolderId) {
       console.log(pageTexts.join('\n'))
       console.log("content too short! not adding")
     }
-    const heapSnapshot = v8.getHeapSnapshot(); 
-    console.log('Heap snapshot:', heapSnapshot);
+    logHeapSnapshot();
+    writeHeapSnapshot();
       console.log(`${url} - all pages`);
       return { ...row, doc_link: docLink };
     } else if (all_pages === 'no') {
@@ -501,7 +515,23 @@ async function processRowsInParallel(rows, parentFolderId) {
   return Promise.all(promises);
 }
 
+function logHeapSnapshot() {
+  const snapshotStream = v8.getHeapSnapshot();
+  let snapshotData = '';
 
+  snapshotStream.on('data', chunk => {
+    snapshotData += chunk;
+  });
+
+  snapshotStream.on('end', () => {
+    // Log only the first few kilobytes for simplicity
+    console.log('Heap snapshot (truncated):', snapshotData.slice(0, 1024));
+  });
+
+  snapshotStream.on('error', err => {
+    console.error('Error reading heap snapshot:', err);
+  });
+}
 async function isMedia(url) {
   try {
     const response = await axios.head(url);
