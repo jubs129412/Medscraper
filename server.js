@@ -497,7 +497,7 @@ async function processRowsInParallel(rows, parentFolderId) {
     }
     else {
       console.log(pageTexts.join('\n'))
-      console.log("content too short! not adding")
+      console.log(`content too short! not adding ${url}`)
       return { ...row, doc_link: null };
     }
       console.log(`${url} - all pages`);
