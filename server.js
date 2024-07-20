@@ -366,9 +366,9 @@ async function getUrlsFromSitemap(sitemapUrl) {
     const worker = fork('./sitemap.js');
 
     const timeout = setTimeout(() => {
+      resolve([]); // Return an empty array on timeout
       worker.kill();
-      reject(new Error('Timed out after 1 minute'));
-    }, 60000); // 1 minute timeout
+    }, 120000); // 1 minute timeout
 
     worker.on('message', async (urls) => {
       clearTimeout(timeout);
