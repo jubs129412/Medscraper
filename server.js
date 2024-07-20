@@ -364,8 +364,14 @@ async function scrapeLocal(url, parentFolderId) {
 async function getUrlsFromSitemap(sitemapUrl) {
   return new Promise((resolve, reject) => {
     const worker = fork('./sitemap.js');
-      
+
+    const timeout = setTimeout(() => {
+      worker.kill();
+      reject(new Error('Timed out after 1 minute'));
+    }, 60000); // 1 minute timeout
+
     worker.on('message', async (urls) => {
+      clearTimeout(timeout);
       resolve(urls);
       worker.kill();
       global.gc();global.gc();global.gc();global.gc();global.gc();
@@ -373,17 +379,19 @@ async function getUrlsFromSitemap(sitemapUrl) {
     });
 
     worker.on('error', async (error) => {
+      clearTimeout(timeout);
       worker.kill();
       global.gc();global.gc();global.gc();global.gc();global.gc();
       await new Promise(resolve => setTimeout(resolve, 500));
-      return []; // Returning an empty string on rejection
+      resolve([]); // Return an empty array on timeout
     });
 
     worker.on('exit', async (code) => {
+      clearTimeout(timeout);
       if (code !== 0) {
         global.gc();global.gc();global.gc();global.gc();global.gc();
         await new Promise(resolve => setTimeout(resolve, 500));
-        return []; // Returning an empty string on rejection
+        resolve([]); // Return an empty array on timeout
       }
     });
 
