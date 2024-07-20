@@ -417,7 +417,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
             await makeFolderPublic(newFolderId);
             const processedResults = await processRowsInParallel(results, newFolderId);
             console.log("postproc")
-            //await uploadCsvToDrive(newFolderId, fileName, processedResults);
+            await uploadCsvToDrive(newFolderId, fileName, processedResults);
           } else {
             res.status(500).send('Error creating new folder.');
           }
@@ -498,6 +498,7 @@ async function processRowsInParallel(rows, parentFolderId) {
     else {
       console.log(pageTexts.join('\n'))
       console.log("content too short! not adding")
+      return { ...row, doc_link: null };
     }
       console.log(`${url} - all pages`);
       return { ...row, doc_link: docLink };
