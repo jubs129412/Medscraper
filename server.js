@@ -194,21 +194,21 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     let index = 1; // Start index at 1 to avoid the initial section break
 
     for (const line of lines) {
-      let request = {
-        insertText: {
-          location: { index: index },
-          text: line + '\n',
-        },
-      };
-      requests.push(request);
-      index += line.length + 1;
-
+      let request = null;
       if (line.startsWith('#### ')) {
+        request = {
+          insertText: {
+            location: { index: index },
+            text: line.replace('#### ', '') + '\n',
+          },
+        };
+        requests.push(request);
+        
         requests.push({
           updateParagraphStyle: {
             range: {
-              startIndex: index - (line.length + 1),
-              endIndex: index,
+              startIndex: index,
+              endIndex: index + line.replace('#### ', '').length + 1,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_4',
@@ -216,12 +216,22 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
+        
+        index += line.replace('#### ', '').length + 1;
       } else if (line.startsWith('### ')) {
+        request = {
+          insertText: {
+            location: { index: index },
+            text: line.replace('### ', '') + '\n',
+          },
+        };
+        requests.push(request);
+        
         requests.push({
           updateParagraphStyle: {
             range: {
-              startIndex: index - (line.length + 1),
-              endIndex: index,
+              startIndex: index,
+              endIndex: index + line.replace('### ', '').length + 1,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_3',
@@ -229,6 +239,17 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
+        
+        index += line.replace('### ', '').length + 1;
+      } else {
+        request = {
+          insertText: {
+            location: { index: index },
+            text: line + '\n',
+          },
+        };
+        requests.push(request);
+        index += line.length + 1;
       }
     }
 
@@ -259,7 +280,6 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     return null;
   }
 }
-
 const logMemoryUsage = () => {
   const memoryUsage = process.memoryUsage();
   console.log('Memory Usage:');
