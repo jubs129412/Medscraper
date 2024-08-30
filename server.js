@@ -194,23 +194,20 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     let index = 1; // Start index at 1 to avoid the initial section break
 
     for (const line of lines) {
-      let request = null;
-      if (line.startsWith('#### ')) {
-        request = {
-          insertText: {
-            location: {
-              index: index,
-            },
-            text: line.replace('#### ', '') + '\n',
-          },
-        };
-        requests.push(request);
-        index += line.replace('#### ', '').length + 1;
+      let request = {
+        insertText: {
+          location: { index: index },
+          text: line + '\n',
+        },
+      };
+      requests.push(request);
+      index += line.length + 1;
 
-        request = {
+      if (line.startsWith('#### ')) {
+        requests.push({
           updateParagraphStyle: {
             range: {
-              startIndex: index - (line.replace('#### ', '').length + 1),
+              startIndex: index - (line.length + 1),
               endIndex: index,
             },
             paragraphStyle: {
@@ -218,23 +215,12 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             },
             fields: 'namedStyleType',
           },
-        };
+        });
       } else if (line.startsWith('### ')) {
-        request = {
-          insertText: {
-            location: {
-              index: index,
-            },
-            text: line.replace('### ', '') + '\n',
-          },
-        };
-        requests.push(request);
-        index += line.replace('### ', '').length + 1;
-
-        request = {
+        requests.push({
           updateParagraphStyle: {
             range: {
-              startIndex: index - (line.replace('### ', '').length + 1),
+              startIndex: index - (line.length + 1),
               endIndex: index,
             },
             paragraphStyle: {
@@ -242,20 +228,8 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             },
             fields: 'namedStyleType',
           },
-        };
-      } else {
-        request = {
-          insertText: {
-            location: {
-              index: index,
-            },
-            text: line + '\n',
-          },
-        };
-        requests.push(request);
-        index += line.length + 1;
+        });
       }
-      requests.push(request);
     }
 
     await docs.documents.batchUpdate({
@@ -285,6 +259,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     return null;
   }
 }
+
 const logMemoryUsage = () => {
   const memoryUsage = process.memoryUsage();
   console.log('Memory Usage:');
