@@ -194,16 +194,13 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     let index = 1; // Start index at 1 to avoid the initial section break
 
     for (const line of lines) {
-      let request = null;
       if (line.startsWith('#### ')) {
-        request = {
+        requests.push({
           insertText: {
             location: { index: index },
             text: line.replace('#### ', '') + '\n',
           },
-        };
-        requests.push(request);
-        
+        });
         requests.push({
           updateParagraphStyle: {
             range: {
@@ -216,17 +213,14 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
-        
         index += line.replace('#### ', '').length + 1;
       } else if (line.startsWith('### ')) {
-        request = {
+        requests.push({
           insertText: {
             location: { index: index },
             text: line.replace('### ', '') + '\n',
           },
-        };
-        requests.push(request);
-        
+        });
         requests.push({
           updateParagraphStyle: {
             range: {
@@ -239,17 +233,67 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
-        
         index += line.replace('### ', '').length + 1;
       } else {
-        request = {
-          insertText: {
-            location: { index: index },
-            text: line + '\n',
-          },
-        };
-        requests.push(request);
-        index += line.length + 1;
+        // Handle bold text markdown
+        const boldRegex = /\*\*(.*?)\*\*/g;
+        let lastIndex = 0;
+        let match;
+
+        while ((match = boldRegex.exec(line)) !== null) {
+          // Insert text before the bold part
+          if (match.index > lastIndex) {
+            requests.push({
+              insertText: {
+                location: { index: index },
+                text: line.substring(lastIndex, match.index),
+              },
+            });
+            index += match.index - lastIndex;
+          }
+
+          // Insert bold text
+          requests.push({
+            insertText: {
+              location: { index: index },
+              text: match[1],
+            },
+          });
+          requests.push({
+            updateTextStyle: {
+              range: {
+                startIndex: index,
+                endIndex: index + match[1].length,
+              },
+              textStyle: {
+                bold: true,
+              },
+              fields: 'bold',
+            },
+          });
+          index += match[1].length;
+          lastIndex = boldRegex.lastIndex;
+        }
+
+        // Insert any remaining text after the last bold part
+        if (lastIndex < line.length) {
+          requests.push({
+            insertText: {
+              location: { index: index },
+              text: line.substring(lastIndex) + '\n',
+            },
+          });
+          index += line.length - lastIndex + 1;
+        } else if (lastIndex === line.length) {
+          // Add a newline if the line ended with bold text
+          requests.push({
+            insertText: {
+              location: { index: index },
+              text: '\n',
+            },
+          });
+          index += 1;
+        }
       }
     }
 
@@ -280,6 +324,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     return null;
   }
 }
+
 const logMemoryUsage = () => {
   const memoryUsage = process.memoryUsage();
   console.log('Memory Usage:');
