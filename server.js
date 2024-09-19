@@ -192,40 +192,21 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     const requests = [];
 
     let index = 1; // Start index at 1 to avoid the initial section break
-
+    
     for (const line of lines) {
-      if (line.startsWith('#### ')) {
+      if (line.startsWith('# ')) {
+        // Heading 3 for '# '
         requests.push({
           insertText: {
             location: { index: index },
-            text: line.replace('#### ', '') + '\n',
+            text: line.replace('# ', '') + '\n',
           },
         });
         requests.push({
           updateParagraphStyle: {
             range: {
               startIndex: index,
-              endIndex: index + line.replace('#### ', '').length + 1,
-            },
-            paragraphStyle: {
-              namedStyleType: 'HEADING_4',
-            },
-            fields: 'namedStyleType',
-          },
-        });
-        index += line.replace('#### ', '').length + 1;
-      } else if (line.startsWith('### ')) {
-        requests.push({
-          insertText: {
-            location: { index: index },
-            text: line.replace('### ', '') + '\n',
-          },
-        });
-        requests.push({
-          updateParagraphStyle: {
-            range: {
-              startIndex: index,
-              endIndex: index + line.replace('### ', '').length + 1,
+              endIndex: index + line.replace('# ', '').length + 1,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_3',
@@ -233,69 +214,61 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
-        index += line.replace('### ', '').length + 1;
+        index += line.replace('# ', '').length + 1;
+      } else if (line.startsWith('## ')) {
+        // Heading 4 for '## '
+        requests.push({
+          insertText: {
+            location: { index: index },
+            text: line.replace('## ', '') + '\n',
+          },
+        });
+        requests.push({
+          updateParagraphStyle: {
+            range: {
+              startIndex: index,
+              endIndex: index + line.replace('## ', '').length + 1,
+            },
+            paragraphStyle: {
+              namedStyleType: 'HEADING_4',
+            },
+            fields: 'namedStyleType',
+          },
+        });
+        index += line.replace('## ', '').length + 1;
+      } else if (line.startsWith('#')) {
+        // Bold text for lines starting with '#'
+        requests.push({
+          insertText: {
+            location: { index: index },
+            text: line.replace('#', '') + '\n',
+          },
+        });
+        requests.push({
+          updateTextStyle: {
+            range: {
+              startIndex: index,
+              endIndex: index + line.replace('#', '').length + 1,
+            },
+            textStyle: {
+              bold: true,
+            },
+            fields: 'bold',
+          },
+        });
+        index += line.replace('#', '').length + 1;
       } else {
-        // Handle bold text markdown
-        const boldRegex = /\*\*(.*?)\*\*/g;
-        let lastIndex = 0;
-        let match;
-
-        while ((match = boldRegex.exec(line)) !== null) {
-          // Insert text before the bold part
-          if (match.index > lastIndex) {
-            requests.push({
-              insertText: {
-                location: { index: index },
-                text: line.substring(lastIndex, match.index),
-              },
-            });
-            index += match.index - lastIndex;
-          }
-
-          // Insert bold text
-          requests.push({
-            insertText: {
-              location: { index: index },
-              text: match[1],
-            },
-          });
-          requests.push({
-            updateTextStyle: {
-              range: {
-                startIndex: index,
-                endIndex: index + match[1].length,
-              },
-              textStyle: {
-                bold: true,
-              },
-              fields: 'bold',
-            },
-          });
-          index += match[1].length;
-          lastIndex = boldRegex.lastIndex;
-        }
-
-        // Insert any remaining text after the last bold part
-        if (lastIndex < line.length) {
-          requests.push({
-            insertText: {
-              location: { index: index },
-              text: line.substring(lastIndex) + '\n',
-            },
-          });
-          index += line.length - lastIndex + 1;
-        } else if (lastIndex === line.length) {
-          // Add a newline if the line ended with bold text
-          requests.push({
-            insertText: {
-              location: { index: index },
-              text: '\n',
-            },
-          });
-          index += 1;
-        }
+        // Insert plain text (no formatting)
+        requests.push({
+          insertText: {
+            location: { index: index },
+            text: line + '\n',
+          },
+        });
+        index += line.length + 1;
       }
     }
+    
 
     await docs.documents.batchUpdate({
       documentId: documentId,
@@ -335,13 +308,13 @@ const logMemoryUsage = () => {
   console.log(`Array Buffers: ${memoryUsage.arrayBuffers / 1024 / 1024} MB`);
 };
 
-async function generateText(text) {
+async function generateText(url, text) {
   console.log("begin generate!")
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const chatCompletion = await openai.chat.completions.create({
-      messages: [{ role: 'user', content: prompt + text }],
+      messages: [{ role: 'system', content: prompt },{ role: 'user', content: `Website: ${url}` + text }],
       model: process.env.GPT_MODEL,
     });
     console.log("generate complete!")
@@ -371,7 +344,7 @@ async function scrapeLocal(url, parentFolderId) {
 
     // Extract specific content using cheerio selectors
     const content = Array.from($("h1, h2, h3, h4, h5, h6, p")).map((x) => $(x).text()).join('\n');
-    const generatedText = await generateText(content);
+    const generatedText = await generateText(url, content);
     console.log("generate complete after call!")
 
     // Create and move the document
@@ -537,7 +510,7 @@ async function processRowsInParallel(rows, parentFolderId) {
       if (pageTexts.join('\n').length > 100){
         pageTexts = pageTexts.join('\n')
         console.log("pre gentext")
-      var content = await generateText(pageTexts);
+      var content = await generateText(url, pageTexts);
       console.log("generate complete pre doclink!")
       logMemoryUsage();
       var docLink = await createAndMoveDocument(content, url, parentFolderId);
