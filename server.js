@@ -192,7 +192,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     const requests = [];
 
     let index = 1; // Start index at 1 to avoid the initial section break
-    
+
     for (const line of lines) {
       if (line.startsWith('# ')) {
         // Heading 3 for '# '
@@ -314,7 +314,7 @@ async function generateText(url, text) {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const chatCompletion = await openai.chat.completions.create({
-      messages: [{ role: 'system', content: prompt },{ role: 'user', content: `Website: ${url}` + text }],
+      messages: [{ role: 'assistant', content: prompt },{ role: 'user', content: `Website: ${url}` + text }],
       model: process.env.GPT_MODEL,
     });
     console.log("generate complete!")
