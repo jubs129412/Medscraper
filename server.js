@@ -194,29 +194,8 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     let index = 1; // Start index at 1 to avoid the initial section break
 
     for (const line of lines) {
-      if (line.startsWith('### ')) {
+      if (line.startsWith('## ')) {
         // Heading 3 for '### '
-        requests.push({
-          insertText: {
-            location: { index: index },
-            text: line.replace('### ', '') + '\n',
-          },
-        });
-        requests.push({
-          updateParagraphStyle: {
-            range: {
-              startIndex: index,
-              endIndex: index + line.replace('### ', '').length + 1,
-            },
-            paragraphStyle: {
-              namedStyleType: 'HEADING_4',
-            },
-            fields: 'namedStyleType',
-          },
-        });
-        index += line.replace('### ', '').length + 1;
-      } else if (line.startsWith('## ')) {
-        // Heading 4 for '## '
         requests.push({
           insertText: {
             location: { index: index },
@@ -230,14 +209,14 @@ async function createAndMoveDocument(content, url, parentFolderId) {
               endIndex: index + line.replace('## ', '').length + 1,
             },
             paragraphStyle: {
-              namedStyleType: 'HEADING_3',
+              namedStyleType: 'HEADING_4',
             },
             fields: 'namedStyleType',
           },
         });
         index += line.replace('## ', '').length + 1;
       } else if (line.startsWith('# ')) {
-        // Bold text for lines starting with '# '
+        // Heading 4 for '## '
         requests.push({
           insertText: {
             location: { index: index },
@@ -245,10 +224,31 @@ async function createAndMoveDocument(content, url, parentFolderId) {
           },
         });
         requests.push({
-          updateTextStyle: {
+          updateParagraphStyle: {
             range: {
               startIndex: index,
               endIndex: index + line.replace('# ', '').length + 1,
+            },
+            paragraphStyle: {
+              namedStyleType: 'HEADING_3',
+            },
+            fields: 'namedStyleType',
+          },
+        });
+        index += line.replace('# ', '').length + 1;
+      } else if (line.startsWith('### ')) {
+        // Bold text for lines starting with '# '
+        requests.push({
+          insertText: {
+            location: { index: index },
+            text: line.replace('### ', '') + '\n',
+          },
+        });
+        requests.push({
+          updateTextStyle: {
+            range: {
+              startIndex: index,
+              endIndex: index + line.replace('### ', '').length + 1,
             },
             textStyle: {
               bold: true,
@@ -256,7 +256,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'bold',
           },
         });
-        index += line.replace('# ', '').length + 1;
+        index += line.replace('### ', '').length + 1;
       } else {
         // Insert plain text (no formatting)
         requests.push({
