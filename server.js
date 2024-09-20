@@ -196,17 +196,18 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     for (const line of lines) {
       if (line.startsWith('## ')) {
         // Heading 3 for '### '
+        const text = line.replace('## ', '');
         requests.push({
           insertText: {
             location: { index: index },
-            text: line.replace('## ', '') + '\n',
+            text: text + '\n',
           },
         });
         requests.push({
           updateParagraphStyle: {
             range: {
               startIndex: index,
-              endIndex: index + line.replace('## ', '').length + 1,
+              endIndex: index + text.length + 1,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_4',
@@ -214,20 +215,21 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
-        index += line.replace('## ', '').length + 1;
+        index += text.length + 1;
       } else if (line.startsWith('# ')) {
         // Heading 4 for '## '
+        const text = line.replace('# ', '');
         requests.push({
           insertText: {
             location: { index: index },
-            text: line.replace('# ', '') + '\n',
+            text: text + '\n',
           },
         });
         requests.push({
           updateParagraphStyle: {
             range: {
               startIndex: index,
-              endIndex: index + line.replace('# ', '').length + 1,
+              endIndex: index + text.length + 1,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_3',
@@ -235,28 +237,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
-        index += line.replace('# ', '').length + 1;
-      } else if (line.startsWith('### ')) {
-        // Bold text for lines starting with '# '
-        requests.push({
-          insertText: {
-            location: { index: index },
-            text: line.replace('### ', '') + '\n',
-          },
-        });
-        requests.push({
-          updateTextStyle: {
-            range: {
-              startIndex: index,
-              endIndex: index + line.replace('### ', '').length + 1,
-            },
-            textStyle: {
-              bold: true,
-            },
-            fields: 'bold',
-          },
-        });
-        index += line.replace('### ', '').length + 1;
+        index += text.length + 1;
       } else {
         // Handle lines with **bold** text
         let currentIndex = 0;
@@ -324,6 +305,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
         index += currentIndex + 1;
       }
     }
+    
     
     
 
