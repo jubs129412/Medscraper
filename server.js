@@ -195,19 +195,18 @@ async function createAndMoveDocument(content, url, parentFolderId) {
 
     for (const line of lines) {
       if (line.startsWith('## ')) {
-        // Heading 3 for '### '
-        const text = line.replace('## ', '');
+        // Heading 4 for '## '
         requests.push({
           insertText: {
             location: { index: index },
-            text: text + '\n',
+            text: line.replace('## ', '') + '\n',
           },
         });
         requests.push({
           updateParagraphStyle: {
             range: {
               startIndex: index,
-              endIndex: index + text.length + 1,
+              endIndex: index + line.replace('## ', '').length + 1,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_4',
@@ -215,21 +214,20 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
-        index += text.length + 1;
+        index += line.replace('## ', '').length + 1;
       } else if (line.startsWith('# ')) {
-        // Heading 4 for '## '
-        const text = line.replace('# ', '');
+        // Heading 3 for '# '
         requests.push({
           insertText: {
             location: { index: index },
-            text: text + '\n',
+            text: line.replace('# ', '') + '\n',
           },
         });
         requests.push({
           updateParagraphStyle: {
             range: {
               startIndex: index,
-              endIndex: index + text.length + 1,
+              endIndex: index + line.replace('# ', '').length + 1,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_3',
@@ -237,42 +235,37 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
-        index += text.length + 1;
-      } else {
-        // Handle lines with **bold** text
-        let currentIndex = 0;
-        let remainingText = line;
-    
-        while (remainingText.includes('**')) {
-          const startBoldIndex = remainingText.indexOf('**');
-          const endBoldIndex = remainingText.indexOf('**', startBoldIndex + 2);
-    
-          if (startBoldIndex !== 0) {
-            // Insert the plain text before bold part
-            const normalText = remainingText.slice(0, startBoldIndex);
+        index += line.replace('# ', '').length + 1;
+      } else if (line.startsWith('### ')) {
+        // Handle bold within the line (i.e., **bold**)
+        let textWithoutHeader = line.replace('### ', '');
+        let parts = textWithoutHeader.split('**');
+        
+        for (let i = 0; i < parts.length; i++) {
+          let part = parts[i];
+          
+          if (i % 2 === 0) {
+            // Even index (plain text)
             requests.push({
               insertText: {
-                location: { index: index + currentIndex },
-                text: normalText,
+                location: { index: index },
+                text: part,
               },
             });
-            currentIndex += normalText.length;
-          }
-    
-          if (endBoldIndex !== -1) {
-            // Insert bold text
-            const boldText = remainingText.slice(startBoldIndex + 2, endBoldIndex);
+            index += part.length;
+          } else {
+            // Odd index (bold text)
             requests.push({
               insertText: {
-                location: { index: index + currentIndex },
-                text: boldText,
+                location: { index: index },
+                text: part,
               },
             });
             requests.push({
               updateTextStyle: {
                 range: {
-                  startIndex: index + currentIndex,
-                  endIndex: index + currentIndex + boldText.length,
+                  startIndex: index,
+                  endIndex: index + part.length,
                 },
                 textStyle: {
                   bold: true,
@@ -280,32 +273,64 @@ async function createAndMoveDocument(content, url, parentFolderId) {
                 fields: 'bold',
               },
             });
-            currentIndex += boldText.length;
-    
-            // Update remaining text after the bold part
-            remainingText = remainingText.slice(endBoldIndex + 2);
-          } else {
-            // If there's an opening '**' but no closing '**', just treat it as plain text
-            remainingText = remainingText.slice(startBoldIndex);
-            break;
+            index += part.length;
           }
         }
-    
-        // Insert any remaining plain text
-        if (remainingText.length > 0) {
-          requests.push({
-            insertText: {
-              location: { index: index + currentIndex },
-              text: remainingText,
-            },
-          });
-          currentIndex += remainingText.length;
+        requests.push({
+          insertText: {
+            location: { index: index },
+            text: '\n',
+          },
+        });
+        index += 1;
+      } else {
+        // Handle plain text and bold text within lines
+        let parts = line.split('**');
+        
+        for (let i = 0; i < parts.length; i++) {
+          let part = parts[i];
+          
+          if (i % 2 === 0) {
+            // Even index (plain text)
+            requests.push({
+              insertText: {
+                location: { index: index },
+                text: part,
+              },
+            });
+            index += part.length;
+          } else {
+            // Odd index (bold text)
+            requests.push({
+              insertText: {
+                location: { index: index },
+                text: part,
+              },
+            });
+            requests.push({
+              updateTextStyle: {
+                range: {
+                  startIndex: index,
+                  endIndex: index + part.length,
+                },
+                textStyle: {
+                  bold: true,
+                },
+                fields: 'bold',
+              },
+            });
+            index += part.length;
+          }
         }
-    
-        index += currentIndex + 1;
+        requests.push({
+          insertText: {
+            location: { index: index },
+            text: '\n',
+          },
+        });
+        index += 1;
       }
-    }
-    
+    }    
     
     
 
