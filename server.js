@@ -209,7 +209,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
               endIndex: index + line.replace('### ', '').length + 1,
             },
             paragraphStyle: {
-              namedStyleType: 'HEADING_3',
+              namedStyleType: 'HEADING_4',
             },
             fields: 'namedStyleType',
           },
@@ -230,7 +230,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
               endIndex: index + line.replace('## ', '').length + 1,
             },
             paragraphStyle: {
-              namedStyleType: 'HEADING_4',
+              namedStyleType: 'HEADING_3',
             },
             fields: 'namedStyleType',
           },
