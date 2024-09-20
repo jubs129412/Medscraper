@@ -196,17 +196,18 @@ async function createAndMoveDocument(content, url, parentFolderId) {
     for (const line of lines) {
       if (line.startsWith('## ')) {
         // Heading 4 for '## '
+        const text = line.replace('## ', '');
         requests.push({
           insertText: {
             location: { index: index },
-            text: line.replace('## ', '') + '\n',
+            text: text + '\n',
           },
         });
         requests.push({
           updateParagraphStyle: {
             range: {
               startIndex: index,
-              endIndex: index + line.replace('## ', '').length + 1,
+              endIndex: index + text.length + 1,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_4',
@@ -214,20 +215,21 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
-        index += line.replace('## ', '').length + 1;
+        index += text.length + 1;
       } else if (line.startsWith('# ')) {
         // Heading 3 for '# '
+        const text = line.replace('# ', '');
         requests.push({
           insertText: {
             location: { index: index },
-            text: line.replace('# ', '') + '\n',
+            text: text + '\n',
           },
         });
         requests.push({
           updateParagraphStyle: {
             range: {
               startIndex: index,
-              endIndex: index + line.replace('# ', '').length + 1,
+              endIndex: index + text.length + 1,
             },
             paragraphStyle: {
               namedStyleType: 'HEADING_3',
@@ -235,7 +237,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
             fields: 'namedStyleType',
           },
         });
-        index += line.replace('# ', '').length + 1;
+        index += text.length + 1;
       } else if (line.startsWith('### ')) {
         // Handle bold within the line (i.e., **bold**)
         let textWithoutHeader = line.replace('### ', '');
@@ -244,36 +246,38 @@ async function createAndMoveDocument(content, url, parentFolderId) {
         for (let i = 0; i < parts.length; i++) {
           let part = parts[i];
           
-          if (i % 2 === 0) {
-            // Even index (plain text)
-            requests.push({
-              insertText: {
-                location: { index: index },
-                text: part,
-              },
-            });
-            index += part.length;
-          } else {
-            // Odd index (bold text)
-            requests.push({
-              insertText: {
-                location: { index: index },
-                text: part,
-              },
-            });
-            requests.push({
-              updateTextStyle: {
-                range: {
-                  startIndex: index,
-                  endIndex: index + part.length,
+          if (part) { // Ensure non-empty parts
+            if (i % 2 === 0) {
+              // Even index (plain text)
+              requests.push({
+                insertText: {
+                  location: { index: index },
+                  text: part,
                 },
-                textStyle: {
-                  bold: true,
+              });
+              index += part.length;
+            } else {
+              // Odd index (bold text)
+              requests.push({
+                insertText: {
+                  location: { index: index },
+                  text: part,
                 },
-                fields: 'bold',
-              },
-            });
-            index += part.length;
+              });
+              requests.push({
+                updateTextStyle: {
+                  range: {
+                    startIndex: index,
+                    endIndex: index + part.length,
+                  },
+                  textStyle: {
+                    bold: true,
+                  },
+                  fields: 'bold',
+                },
+              });
+              index += part.length;
+            }
           }
         }
         requests.push({
@@ -290,36 +294,38 @@ async function createAndMoveDocument(content, url, parentFolderId) {
         for (let i = 0; i < parts.length; i++) {
           let part = parts[i];
           
-          if (i % 2 === 0) {
-            // Even index (plain text)
-            requests.push({
-              insertText: {
-                location: { index: index },
-                text: part,
-              },
-            });
-            index += part.length;
-          } else {
-            // Odd index (bold text)
-            requests.push({
-              insertText: {
-                location: { index: index },
-                text: part,
-              },
-            });
-            requests.push({
-              updateTextStyle: {
-                range: {
-                  startIndex: index,
-                  endIndex: index + part.length,
+          if (part) { // Ensure non-empty parts
+            if (i % 2 === 0) {
+              // Even index (plain text)
+              requests.push({
+                insertText: {
+                  location: { index: index },
+                  text: part,
                 },
-                textStyle: {
-                  bold: true,
+              });
+              index += part.length;
+            } else {
+              // Odd index (bold text)
+              requests.push({
+                insertText: {
+                  location: { index: index },
+                  text: part,
                 },
-                fields: 'bold',
-              },
-            });
-            index += part.length;
+              });
+              requests.push({
+                updateTextStyle: {
+                  range: {
+                    startIndex: index,
+                    endIndex: index + part.length,
+                  },
+                  textStyle: {
+                    bold: true,
+                  },
+                  fields: 'bold',
+                },
+              });
+              index += part.length;
+            }
           }
         }
         requests.push({
@@ -330,9 +336,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
         });
         index += 1;
       }
-    }    
-    
-    
+    }
 
     await docs.documents.batchUpdate({
       documentId: documentId,
