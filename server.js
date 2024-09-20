@@ -258,14 +258,70 @@ async function createAndMoveDocument(content, url, parentFolderId) {
         });
         index += line.replace('### ', '').length + 1;
       } else {
-        // Insert plain text (no formatting)
-        requests.push({
-          insertText: {
-            location: { index: index },
-            text: line + '\n',
-          },
-        });
-        index += line.length + 1;
+        // Handle lines with **bold** text
+        let currentIndex = 0;
+        let remainingText = line;
+    
+        while (remainingText.includes('**')) {
+          const startBoldIndex = remainingText.indexOf('**');
+          const endBoldIndex = remainingText.indexOf('**', startBoldIndex + 2);
+    
+          if (startBoldIndex !== 0) {
+            // Insert the plain text before bold part
+            const normalText = remainingText.slice(0, startBoldIndex);
+            requests.push({
+              insertText: {
+                location: { index: index + currentIndex },
+                text: normalText,
+              },
+            });
+            currentIndex += normalText.length;
+          }
+    
+          if (endBoldIndex !== -1) {
+            // Insert bold text
+            const boldText = remainingText.slice(startBoldIndex + 2, endBoldIndex);
+            requests.push({
+              insertText: {
+                location: { index: index + currentIndex },
+                text: boldText,
+              },
+            });
+            requests.push({
+              updateTextStyle: {
+                range: {
+                  startIndex: index + currentIndex,
+                  endIndex: index + currentIndex + boldText.length,
+                },
+                textStyle: {
+                  bold: true,
+                },
+                fields: 'bold',
+              },
+            });
+            currentIndex += boldText.length;
+    
+            // Update remaining text after the bold part
+            remainingText = remainingText.slice(endBoldIndex + 2);
+          } else {
+            // If there's an opening '**' but no closing '**', just treat it as plain text
+            remainingText = remainingText.slice(startBoldIndex);
+            break;
+          }
+        }
+    
+        // Insert any remaining plain text
+        if (remainingText.length > 0) {
+          requests.push({
+            insertText: {
+              location: { index: index + currentIndex },
+              text: remainingText,
+            },
+          });
+          currentIndex += remainingText.length;
+        }
+    
+        index += currentIndex + 1;
       }
     }
     
