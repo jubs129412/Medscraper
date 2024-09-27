@@ -587,16 +587,16 @@ async function processRowsInParallel(rows, parentFolderId) {
     else {
       console.log(pageTexts.join('\n'))
       console.log(`content too short! not adding ${url}`)
-      return { ...row, doc_link: null };
+      return { ...row, doc_link: null, text: content };
     }
       console.log(`${url} - all pages`);
-      return { ...row, doc_link: docLink };
+      return { ...row, doc_link: docLink, text: content };
     } else if (all_pages === 'no') {
       const { content, docLink } = await scrapeLocal(url, parentFolderId);
-      return { ...row, doc_link: docLink };
+      return { ...row, doc_link: docLink, text: content };
     } else {
       console.log(`Invalid value for "all_pages" for URL: ${url}`);
-      return { ...row, doc_link: null };
+      return { ...row, doc_link: null, text: content };
     }
   }));
 
