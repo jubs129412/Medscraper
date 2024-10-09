@@ -550,7 +550,7 @@ function writeHeapSnapshot() {
 }
 async function processRowsInParallel(rows, parentFolderId) {
  
-  const limit = pLimit(50); 
+  const limit = pLimit(25); 
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
