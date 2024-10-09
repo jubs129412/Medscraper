@@ -781,10 +781,10 @@ async function appendDataToCsv(fileId, newData) {
   });
 
   // Read the file content
-  const existingCsv = fs.readFileSync(tmpFile.name, 'utf-8');
+  let existingCsv = fs.readFileSync(tmpFile.name, 'utf-8').trim(); // Use trim to remove unnecessary whitespace
 
   // Check if headers are already in the file
-  const hasHeaders = existingCsv.includes('url,all_pages,doc_link,text');
+  const hasHeaders = existingCsv.startsWith('url,all_pages,doc_link,text');
 
   // Parse existing CSV and add new data
   const fields = ['url', 'all_pages', 'doc_link', 'text'];
@@ -800,8 +800,16 @@ async function appendDataToCsv(fileId, newData) {
     newCsv = parser.parse([newData]);
   }
 
-  // Append the new data to the existing content
-  const updatedCsvContent = `${existingCsv.trim()}\n${newCsv}`;
+  // Ensure exactly one newline between existing content and new data
+  let updatedCsvContent = existingCsv;
+  
+  // Add a newline if the file does not end with one
+  if (!existingCsv.endsWith('\n')) {
+    updatedCsvContent += '\n';
+  }
+  
+  // Append new data
+  updatedCsvContent += newCsv;
 
   // Re-upload the updated CSV content
   const media = {
