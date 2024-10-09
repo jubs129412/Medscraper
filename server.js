@@ -786,7 +786,7 @@ function timeoutPromise(ms, promise) {
   });
 }
 
-async function appendDataToCsv(fileId, data, retries = 3) {
+async function appendDataToCsv(fileId, data, retries = 5) {
   const authClient = await auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: authClient });
 
@@ -795,7 +795,7 @@ async function appendDataToCsv(fileId, data, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
       await timeoutPromise(
-        10000, // 10 seconds
+        30000, // 10 seconds
         sheets.spreadsheets.values.append({
           spreadsheetId: fileId,
           range: 'Sheet1',
@@ -814,7 +814,6 @@ async function appendDataToCsv(fileId, data, retries = 3) {
         console.log(`Retrying request... (${i + 1}/${retries})`);
       } else {
         console.error(`Failed to append data after ${retries} attempts:`, error);
-        throw error;
       }
     }
   }
