@@ -550,23 +550,10 @@ function writeHeapSnapshot() {
 async function processRowsInParallel(rows, parentFolderId, FileId) {
   const limit = pLimit(25); // Limit concurrent promises
 
-  // Function to handle timeouts
-  function timeoutPromise(ms, row) {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        console.log(`Timeout for URL: ${row.url}`);
-        resolve({ ...row, doc_link: null, text: null });
-      }, ms);
-    });
-  }
-
-  const promises = rows.map((row) =>
-    limit(async () => {
-      const { url, all_pages } = row;
+  const promises = rows.map((row) => limit(async () => {
+    const { url, all_pages } = row;
 
       // Wrap the main task in a race with the timeout
-      return Promise.race([
-        (async () => {
           if (all_pages === 'yes') {
             let pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
             if (pages.length === 0) {
@@ -617,16 +604,11 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
             appendDataToCsv(FileId, { url: url, doc_link: null, text: null }, 50, row_auth )
             return { ...row, doc_link: null, text: null };
           }
-        })(),
-
-        // 10-minute timeout (600,000 ms)
-        timeoutPromise(600000, row),
-      ]);
-    })
-  );
-
-  return Promise.all(promises);
-}
+        }))
+      
+        return Promise.all(promises);
+      }
+    
 
 function logHeapSnapshot() {
   const snapshotStream = v8.getHeapSnapshot();
