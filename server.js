@@ -119,11 +119,7 @@ async function createNewFolder(parentFolderId, folderName) {
   const createFolder = async () => {
 
     const authClient = await auth.getClient();
-    const drive = google.drive({ version: 'v3', auth: authClient,
-      // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-      requestOptions: {
-        timeout: 30000, // 10 seconds
-      }, });
+    const drive = google.drive({ version: 'v3', auth: authClient });
 
     const fileMetadata = {
       name: folderName,
@@ -153,11 +149,7 @@ async function makeFolderPublic(folderId) {
 
 
     const authClient = await auth.getClient();
-    const drive = google.drive({ version: 'v3', auth: authClient,
-      // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-      requestOptions: {
-        timeout: 30000, // 10 seconds
-      }, });
+    const drive = google.drive({ version: 'v3', auth: authClient });
 
     await drive.permissions.create({
       fileId: folderId,
@@ -183,28 +175,12 @@ async function createAndMoveDocument(content, url, parentFolderId) {
 
 
     const authClient = await auth.getClient();
-    const docs = google.docs({
-      version: 'v1',
-      auth: auth,
-      // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-      requestOptions: {
-        timeout: 30000, // 10 seconds
-      },
-    });
-        const drive = google.drive({ version: 'v3', auth: authClient,
-          // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-          requestOptions: {
-            timeout: 30000, // 10 seconds
-          },
- });
+    const docs = google.docs({ version: 'v1', auth: authClient });
+    const drive = google.drive({ version: 'v3', auth: authClient });
 
     const docCreationResponse = await docs.documents.create({
       requestBody: {
         title: url,
-      },
-      // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-      requestOptions: {
-        timeout: 30000, // 10 seconds
       },
     });
 
@@ -365,10 +341,6 @@ async function createAndMoveDocument(content, url, parentFolderId) {
       documentId: documentId,
       requestBody: {
         requests: requests,
-      },
-      // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-      requestOptions: {
-        timeout: 30000, // 10 seconds
       },
     });
 
@@ -622,20 +594,20 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
               const docLink = await createAndMoveDocument(content, url, parentFolderId);
 
               console.log(`${url} - all pages`);
-              appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '')} , 50)
+              //appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '')} , 50)
               return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
             } else {
               console.log(`Content too short! Not adding ${url}`);
-              appendDataToCsv(FileId, { url: url, doc_link: null, text: null } , 3)
+              //appendDataToCsv(FileId, { url: url, doc_link: null, text: null } , 3)
               return { ...row, doc_link: null, text: null };
             }
           } else if (all_pages === 'no') {
             const { content, docLink } = await scrapeLocal(url, parentFolderId);
-            appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '') }, 50)
+            //appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '') }, 50)
             return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
           } else {
             console.log(`Invalid value for "all_pages" for URL: ${url}`);
-            appendDataToCsv(FileId, { url: url, doc_link: null, text: null }, 50 )
+            //appendDataToCsv(FileId, { url: url, doc_link: null, text: null }, 50 )
             return { ...row, doc_link: null, text: null };
           }
         })(),
@@ -760,16 +732,8 @@ function sendCsvResponse(res, data) {
 
 async function createEmptyCsvFile(folderId, fileName) {
   const authClient = await auth.getClient();
-  const drive = google.drive({ version: 'v3', auth: authClient,requestOptions: {
-    timeout: 30000, // 10 seconds
-  }, },
-    // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-);
-  const sheets = google.sheets({ version: 'v4', auth: authClient,
-    // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-    requestOptions: {
-      timeout: 30000, // 10 seconds
-    }, });
+  const drive = google.drive({ version: 'v3', auth: authClient });
+  const sheets = google.sheets({ version: 'v4', auth: authClient });
 
   // Step 1: Create a blank Google Sheet in the specified folder
   const fileMetadata = {
@@ -795,10 +759,6 @@ async function createEmptyCsvFile(folderId, fileName) {
     valueInputOption: 'RAW',
     resource: {
       values: [headers],
-    },
-    // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-    requestOptions: {
-      timeout: 30000, // 10 seconds
     },
   });
 
@@ -828,11 +788,7 @@ function timeoutPromise(ms, promise) {
 
 async function appendDataToCsv(fileId, data, retries = 50) {
   const authClient = await auth.getClient();
-  const sheets = google.sheets({ version: 'v4', auth: authClient ,
-    // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-    requestOptions: {
-      timeout: 30000, // 10 seconds
-    },});
+  const sheets = google.sheets({ version: 'v4', auth: authClient });
 
   const rowData = [data.url, data.all_pages || '', data.doc_link, data.text];
 
@@ -868,11 +824,7 @@ async function uploadCsvToDrive(folderId, fileName, data) {
 
 
     const authClient = await auth.getClient();
-    const drive = google.drive({ version: 'v3', auth: authClient,
-      // This sets a default timeout for all requests made through this client (e.g., 10 seconds)
-      requestOptions: {
-        timeout: 30000, // 10 seconds
-      }, });
+    const drive = google.drive({ version: 'v3', auth: authClient });
 
     const fields = Object.keys(data[0]);
     const parser = new Parser({ fields });
