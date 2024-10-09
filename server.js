@@ -597,6 +597,7 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
               const docLink = await createAndMoveDocument(content, url, parentFolderId);
 
               console.log(`${url} - all pages`);
+              appendDataToCsv(FileId, { ...row, doc_link: docLink, text: content.replace(/#+/g, '')} )
               return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
             } else {
               console.log(`Content too short! Not adding ${url}`);
