@@ -90,12 +90,12 @@ function getBaseUrl(websiteUrl) {
   }
 }
 
-async function retryWithBackoff(fn, retries = 5, delay = 10000) {
+async function retryWithBackoff(fn, retries = 50, delay = 10000) {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (error) {
-      console.log(error)
+      console.warn(error)
       if (i === retries - 1) throw error;
       const waitTime = delay * Math.pow(2, i);
       console.warn(`Retrying in ${waitTime / 1000} seconds...`);
@@ -550,7 +550,7 @@ function writeHeapSnapshot() {
 }
 async function processRowsInParallel(rows, parentFolderId) {
  
-  const limit = pLimit(100); 
+  const limit = pLimit(50); 
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
