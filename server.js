@@ -594,7 +594,7 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
               const docLink = await createAndMoveDocument(content, url, parentFolderId);
 
               console.log(`${url} - all pages`);
-              appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '')} , 3)
+              appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '')} , 50)
               return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
             } else {
               console.log(`Content too short! Not adding ${url}`);
@@ -603,11 +603,11 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
             }
           } else if (all_pages === 'no') {
             const { content, docLink } = await scrapeLocal(url, parentFolderId);
-            appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '') }, 3)
+            appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '') }, 50)
             return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
           } else {
             console.log(`Invalid value for "all_pages" for URL: ${url}`);
-            appendDataToCsv(FileId, { url: url, doc_link: null, text: null }, 3 )
+            appendDataToCsv(FileId, { url: url, doc_link: null, text: null }, 50 )
             return { ...row, doc_link: null, text: null };
           }
         })(),
@@ -786,7 +786,7 @@ function timeoutPromise(ms, promise) {
   });
 }
 
-async function appendDataToCsv(fileId, data, retries = 5) {
+async function appendDataToCsv(fileId, data, retries = 50) {
   const authClient = await auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: authClient });
 
