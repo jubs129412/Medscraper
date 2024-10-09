@@ -95,6 +95,7 @@ async function retryWithBackoff(fn, retries = 5, delay = 10000) {
     try {
       return await fn();
     } catch (error) {
+      console.log(error)
       if (i === retries - 1) throw error;
       const waitTime = delay * Math.pow(2, i);
       console.warn(`Retrying in ${waitTime / 1000} seconds...`);
@@ -361,7 +362,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
   try {
     return await retryWithBackoff(createDocument);
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error with doc:', error.message);
     return null;
   }
 }
@@ -549,7 +550,7 @@ function writeHeapSnapshot() {
 }
 async function processRowsInParallel(rows, parentFolderId) {
  
-  const limit = pLimit(50); 
+  const limit = pLimit(100); 
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
