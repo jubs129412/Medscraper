@@ -594,20 +594,20 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
               const docLink = await createAndMoveDocument(content, url, parentFolderId);
 
               console.log(`${url} - all pages`);
-              appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '')} )
+              appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '')} , 3)
               return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
             } else {
               console.log(`Content too short! Not adding ${url}`);
-              appendDataToCsv(FileId, { url: url, doc_link: null, text: null } )
+              appendDataToCsv(FileId, { url: url, doc_link: null, text: null } , 3)
               return { ...row, doc_link: null, text: null };
             }
           } else if (all_pages === 'no') {
             const { content, docLink } = await scrapeLocal(url, parentFolderId);
-            appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '') })
+            appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '') }, 3)
             return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
           } else {
             console.log(`Invalid value for "all_pages" for URL: ${url}`);
-            appendDataToCsv(FileId, { url: url, doc_link: null, text: null } )
+            appendDataToCsv(FileId, { url: url, doc_link: null, text: null }, 3 )
             return { ...row, doc_link: null, text: null };
           }
         })(),
@@ -767,25 +767,35 @@ async function createEmptyCsvFile(folderId, fileName) {
   return spreadsheetId; // Return the Google Sheet ID for future use
 }
 
-async function appendDataToCsv(fileId, data) {
+async function appendDataToCsv(fileId, data, retries = 3) {
   const authClient = await auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: authClient });
 
-  // Extract the values to append from the data object
   const rowData = [data.url, data.all_pages || '', data.doc_link, data.text];
 
-  // Append the rowData to the next available row in the Google Sheet
-  await sheets.spreadsheets.values.append({
-    spreadsheetId: fileId, // ID of the Google Sheet
-    range: 'Sheet1', // Assuming data is being added to Sheet1
-    valueInputOption: 'RAW', // Inserts values as they are
-    insertDataOption: 'INSERT_ROWS', // Ensures rows are inserted at the end
-    resource: {
-      values: [rowData], // The new row to append
-    },
-  });
-
-  console.log(`Data appended to Google Sheet: ${JSON.stringify(rowData)}`);
+  for (let i = 0; i < retries; i++) {
+    try {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: fileId,
+        range: 'Sheet1',
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [rowData],
+        },
+        timeout: 10000, // 10 seconds
+      });
+      console.log(`Data appended to Google Sheet: ${JSON.stringify(rowData)}`);
+      break; // Break the loop if the request succeeds
+    } catch (error) {
+      if (i < retries - 1) {
+        console.log(`Retrying request... (${i + 1}/${retries})`);
+      } else {
+        console.error(`Failed to append data after ${retries} attempts:`, error);
+        throw error;
+      }
+    }
+  }
 }
 
 async function uploadCsvToDrive(folderId, fileName, data) {
