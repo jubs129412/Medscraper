@@ -169,12 +169,12 @@ async function makeFolderPublic(folderId) {
   }
 }
 
-async function createAndMoveDocument(content, url, parentFolderId) {
+async function createAndMoveDocument(content, url, parentFolderId, row_auth) {
   console.log("testing?");
   const createDocument = async () => {
 
 
-    const authClient = await auth.getClient();
+    const authClient = await row_auth.getClient();
     const docs = google.docs({ version: 'v1', auth: authClient });
     const drive = google.drive({ version: 'v3', auth: authClient });
 
@@ -584,30 +584,37 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
               }
             }
             logMemoryUsage();
-
+            const row_auth = new google.auth.GoogleAuth({
+              credentials: credentials,
+              scopes: [
+                'https://www.googleapis.com/auth/documents',
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive',
+              ],
+            });
             if (pageTexts.join('\n').length > 100) {
               pageTexts = pageTexts.join('\n');
               console.log("Pre gentext");
               const content = await generateText(url, pageTexts);
               console.log("Generate complete pre doclink!");
               logMemoryUsage();
-              const docLink = await createAndMoveDocument(content, url, parentFolderId);
+              const docLink = await createAndMoveDocument(content, url, parentFolderId, row_auth);
 
               console.log(`${url} - all pages`);
-              //appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '')} , 50)
+              appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '')} , 50, row_auth)
               return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
             } else {
               console.log(`Content too short! Not adding ${url}`);
-              //appendDataToCsv(FileId, { url: url, doc_link: null, text: null } , 3)
+              appendDataToCsv(FileId, { url: url, doc_link: null, text: null } , 3)
               return { ...row, doc_link: null, text: null };
             }
           } else if (all_pages === 'no') {
             const { content, docLink } = await scrapeLocal(url, parentFolderId);
-            //appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '') }, 50)
+            appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '') }, 50, row_auth)
             return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
           } else {
             console.log(`Invalid value for "all_pages" for URL: ${url}`);
-            //appendDataToCsv(FileId, { url: url, doc_link: null, text: null }, 50 )
+            appendDataToCsv(FileId, { url: url, doc_link: null, text: null }, 50, row_auth )
             return { ...row, doc_link: null, text: null };
           }
         })(),
@@ -786,8 +793,8 @@ function timeoutPromise(ms, promise) {
   });
 }
 
-async function appendDataToCsv(fileId, data, retries = 50) {
-  const authClient = await auth.getClient();
+async function appendDataToCsv(fileId, data, retries = 50, row_auth) {
+  const authClient = await row_auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: authClient });
 
   const rowData = [data.url, data.all_pages || '', data.doc_link, data.text];
