@@ -507,7 +507,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
           const FileId = await createEmptyCsvFile(newFolderId, fileName)
           if (newFolderId) {
             await makeFolderPublic(newFolderId);
-            const processedResults = await processRowsInParallel(results, newFolderId, FileId;
+            const processedResults = await processRowsInParallel(results, newFolderId, FileId);
             console.log("postproc")
             //await uploadCsvToDrive(newFolderId, fileName, processedResults);
           } else {
