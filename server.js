@@ -605,7 +605,7 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
               return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
             } else {
               console.log(`Content too short! Not adding ${url}`);
-              appendDataToCsv(FileId, { url: url, doc_link: null, text: null } , 3)
+              appendDataToCsv(FileId, { url: url, doc_link: null, text: null } , 3, row_auth)
               return { ...row, doc_link: null, text: null };
             }
           } else if (all_pages === 'no') {
