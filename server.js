@@ -12,6 +12,7 @@ const { fork } = require('child_process');
 const axios = require('axios').create({
   httpsAgent: new https.Agent({ rejectUnauthorized: false }),
 });
+const tmp = require('tmp');
 //const cheerio = require('cheerio');
 const cheerio = require('whacko');
 const multer = require('multer');
@@ -503,11 +504,12 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
           const parentFolderId = process.env.G_DRIVE_FOLDER;
           const newFolderName = fileName;
           const newFolderId = await createNewFolder(parentFolderId, newFolderName);
+          const FileId = await createEmptyCsvFile(newFolderId, fileName)
           if (newFolderId) {
             await makeFolderPublic(newFolderId);
-            const processedResults = await processRowsInParallel(results, newFolderId);
+            const processedResults = await processRowsInParallel(results, newFolderId, FileId;
             console.log("postproc")
-            await uploadCsvToDrive(newFolderId, fileName, processedResults);
+            //await uploadCsvToDrive(newFolderId, fileName, processedResults);
           } else {
             res.status(500).send('Error creating new folder.');
           }
@@ -548,58 +550,75 @@ function writeHeapSnapshot() {
     console.error('Error writing heap snapshot:', err);
   });
 }
-async function processRowsInParallel(rows, parentFolderId) {
- 
-  const limit = pLimit(25); 
+async function processRowsInParallel(rows, parentFolderId, FileId) {
+  const limit = pLimit(25); // Limit concurrent promises
 
-  const promises = rows.map((row) => limit(async () => {
-    const { url, all_pages } = row;
+  // Function to handle timeouts
+  function timeoutPromise(ms, row) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        console.log(`Timeout for URL: ${row.url}`);
+        resolve({ ...row, doc_link: null, text: null });
+      }, ms);
+    });
+  }
 
-    if (all_pages === 'yes') {
-      let pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
-      if (pages.length === 0) {
-        pages = [url];
-      }
-      
-      let pageTexts = [];
+  const promises = rows.map((row) =>
+    limit(async () => {
+      const { url, all_pages } = row;
 
-      for (const [index, page] of pages.entries()) {
-        console.log(`Running getPageText for index: ${index}`);
-        try {
-          const text = await getPageText(page);
-          //console.log(text);
-          pageTexts.push(text);
-        } catch (error) {
-          console.error(`Failed to get text for ${page} at index ${index}`, error);
-        }
-      }
-      logMemoryUsage();
+      // Wrap the main task in a race with the timeout
+      return Promise.race([
+        (async () => {
+          if (all_pages === 'yes') {
+            let pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
+            if (pages.length === 0) {
+              pages = [url];
+            }
 
-      console.log("joining")
-      if (pageTexts.join('\n').length > 100){
-        pageTexts = pageTexts.join('\n')
-        console.log("pre gentext")
-      var content = await generateText(url, pageTexts);
-      console.log("generate complete pre doclink!")
-      logMemoryUsage();
-      var docLink = await createAndMoveDocument(content, url, parentFolderId);
-      
-    }
-    else {
-      console.log(pageTexts.join('\n'))
-      console.log(`content too short! not adding ${url}`)
-      return { ...row, doc_link: null, text: null };
-    }
-      console.log(`${url} - all pages`);
-      return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
-    } else if (all_pages === 'no') {
-      const { content, docLink } = await scrapeLocal(url, parentFolderId);
-      return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
-    } else {
-      console.log(`Invalid value for "all_pages" for URL: ${url}`);
-      return { ...row, doc_link: null, text: null };
-    }
-  }));
+            let pageTexts = [];
+            for (const [index, page] of pages.entries()) {
+              console.log(`Running getPageText for index: ${index}`);
+              try {
+                const text = await getPageText(page);
+                pageTexts.push(text);
+              } catch (error) {
+                console.error(`Failed to get text for ${page} at index ${index}`, error);
+              }
+            }
+            logMemoryUsage();
+
+            if (pageTexts.join('\n').length > 100) {
+              pageTexts = pageTexts.join('\n');
+              console.log("Pre gentext");
+              const content = await generateText(url, pageTexts);
+              console.log("Generate complete pre doclink!");
+              logMemoryUsage();
+              const docLink = await createAndMoveDocument(content, url, parentFolderId);
+
+              console.log(`${url} - all pages`);
+              return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
+            } else {
+              console.log(`Content too short! Not adding ${url}`);
+              appendDataToCsv(FileId, { ...row, doc_link: null, text: null } )
+              return { ...row, doc_link: null, text: null };
+            }
+          } else if (all_pages === 'no') {
+            const { content, docLink } = await scrapeLocal(url, parentFolderId);
+            appendDataToCsv(FileId, { ...row, doc_link: docLink, text: content.replace(/#+/g, '') })
+            return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
+          } else {
+            console.log(`Invalid value for "all_pages" for URL: ${url}`);
+            appendDataToCsv(FileId, { ...row, doc_link: null, text: null } )
+            return { ...row, doc_link: null, text: null };
+          }
+        })(),
+
+        // 10-minute timeout (600,000 ms)
+        timeoutPromise(600000, row),
+      ]);
+    })
+  );
 
   return Promise.all(promises);
 }
@@ -711,6 +730,89 @@ function sendCsvResponse(res, data) {
   res.header('Content-Type', 'text/csv');
   res.attachment('output.csv');
   res.send(csv);
+}
+
+async function createEmptyCsvFile(folderId, fileName) {
+  const auth = new google.auth.GoogleAuth({
+    credentials: credentials,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+
+  const authClient = await auth.getClient();
+  const drive = google.drive({ version: 'v3', auth: authClient });
+
+  const headers = ['url', 'all_pages', 'doc_link', 'text'];
+
+  const parser = new Parser({ fields: headers });
+  const csvContent = parser.parse([]);
+
+  const fileMetadata = {
+    name: `${fileName}.csv`,
+    parents: [folderId],
+  };
+
+  const media = {
+    mimeType: 'text/csv',
+    body: csvContent,
+  };
+
+  const file = await drive.files.create({
+    resource: fileMetadata,
+    media: media,
+    fields: 'id',
+  });
+
+  console.log(`Empty CSV file created with ID: ${file.data.id}`);
+  return file.data.id; // Return the file ID for future use
+}
+
+async function appendDataToCsv(fileId, newData) {
+  const auth = new google.auth.GoogleAuth({
+    credentials: credentials,
+    scopes: ['https://www.googleapis.com/auth/drive'],
+  });
+
+  const authClient = await auth.getClient();
+  const drive = google.drive({ version: 'v3', auth: authClient });
+
+  // Download the existing CSV content
+  const file = await drive.files.get(
+    { fileId: fileId, alt: 'media' },
+    { responseType: 'stream' }
+  );
+
+  const tmpFile = tmp.fileSync(); // Temporary file to store the existing CSV
+  const fileStream = fs.createWriteStream(tmpFile.name);
+
+  await new Promise((resolve, reject) => {
+    file.data
+      .on('end', resolve)
+      .on('error', reject)
+      .pipe(fileStream);
+  });
+
+  // Read the file content
+  const existingCsv = fs.readFileSync(tmpFile.name, 'utf-8');
+
+  // Parse existing CSV and add new data
+  const fields = ['url', 'all_pages', 'doc_link', 'text'];
+  const parser = new Parser({ fields });
+  const newCsv = parser.parse([newData]);
+
+  const updatedCsvContent = existingCsv + '\n' + newCsv;
+
+  // Re-upload the updated CSV content
+  const media = {
+    mimeType: 'text/csv',
+    body: updatedCsvContent,
+  };
+
+  await drive.files.update({
+    fileId: fileId,
+    media: media,
+  });
+
+  console.log(`Data appended to CSV file with ID: ${fileId}`);
 }
 
 async function uploadCsvToDrive(folderId, fileName, data) {
