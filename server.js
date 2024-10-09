@@ -55,6 +55,7 @@ const auth = new google.auth.GoogleAuth({
   credentials: credentials,
   scopes: [
     'https://www.googleapis.com/auth/documents',
+    'https://www.googleapis.com/auth/spreadsheets',
     'https://www.googleapis.com/auth/drive',
   ],
 });
@@ -505,7 +506,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
             await makeFolderPublic(newFolderId);
             const processedResults = await processRowsInParallel(results, newFolderId, FileId);
             console.log("postproc")
-            //await uploadCsvToDrive(newFolderId, fileName, processedResults);
+            await uploadCsvToDrive(newFolderId, fileName, processedResults);
           } else {
             res.status(500).send('Error creating new folder.');
           }
@@ -593,20 +594,20 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
               const docLink = await createAndMoveDocument(content, url, parentFolderId);
 
               console.log(`${url} - all pages`);
-              appendDataToCsv(FileId, { ...row, doc_link: docLink, text: content.replace(/#+/g, '')} )
+              appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '')} )
               return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
             } else {
               console.log(`Content too short! Not adding ${url}`);
-              appendDataToCsv(FileId, { ...row, doc_link: null, text: null } )
+              appendDataToCsv(FileId, { url: url, doc_link: null, text: null } )
               return { ...row, doc_link: null, text: null };
             }
           } else if (all_pages === 'no') {
             const { content, docLink } = await scrapeLocal(url, parentFolderId);
-            appendDataToCsv(FileId, { ...row, doc_link: docLink, text: content.replace(/#+/g, '') })
+            appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '') })
             return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
           } else {
             console.log(`Invalid value for "all_pages" for URL: ${url}`);
-            appendDataToCsv(FileId, { ...row, doc_link: null, text: null } )
+            appendDataToCsv(FileId, { url: url, doc_link: null, text: null } )
             return { ...row, doc_link: null, text: null };
           }
         })(),
@@ -730,99 +731,61 @@ function sendCsvResponse(res, data) {
 }
 
 async function createEmptyCsvFile(folderId, fileName) {
-
-
   const authClient = await auth.getClient();
   const drive = google.drive({ version: 'v3', auth: authClient });
+  const sheets = google.sheets({ version: 'v4', auth: authClient });
 
-  const headers = ['url', 'all_pages', 'doc_link', 'text'];
-
-  const parser = new Parser({ fields: headers });
-  const csvContent = parser.parse([]);
-
+  // Step 1: Create a blank Google Sheet in the specified folder
   const fileMetadata = {
-    name: `${fileName}.csv`,
+    name: fileName,
+    mimeType: 'application/vnd.google-apps.spreadsheet',
     parents: [folderId],
-  };
-
-  const media = {
-    mimeType: 'text/csv',
-    body: csvContent,
   };
 
   const file = await drive.files.create({
     resource: fileMetadata,
-    media: media,
     fields: 'id',
   });
 
-  console.log(`Empty CSV file created with ID: ${file.data.id}`);
-  return file.data.id; // Return the file ID for future use
+  const spreadsheetId = file.data.id;
+  console.log(`Empty Google Sheet created with ID: ${spreadsheetId}`);
+
+  // Step 2: Add headers to the first row of the Google Sheet
+  const headers = ['url', 'all_pages', 'doc_link', 'text'];
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: 'Sheet1!A1', // Starting from the first cell
+    valueInputOption: 'RAW',
+    resource: {
+      values: [headers],
+    },
+  });
+
+  console.log(`Headers added to the Google Sheet: ${headers.join(', ')}`);
+
+  return spreadsheetId; // Return the Google Sheet ID for future use
 }
 
-async function appendDataToCsv(fileId, newData) {
+async function appendDataToCsv(fileId, data) {
   const authClient = await auth.getClient();
-  const drive = google.drive({ version: 'v3', auth: authClient });
+  const sheets = google.sheets({ version: 'v4', auth: authClient });
 
-  // Download the existing CSV content
-  const file = await drive.files.get(
-    { fileId: fileId, alt: 'media' },
-    { responseType: 'stream' }
-  );
+  // Extract the values to append from the data object
+  const rowData = [data.url, data.all_pages || '', data.doc_link, data.text];
 
-  const tmpFile = tmp.fileSync(); // Temporary file to store the existing CSV
-  const fileStream = fs.createWriteStream(tmpFile.name);
-
-  await new Promise((resolve, reject) => {
-    file.data
-      .on('end', resolve)
-      .on('error', reject)
-      .pipe(fileStream);
+  // Append the rowData to the next available row in the Google Sheet
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: fileId, // ID of the Google Sheet
+    range: 'Sheet1', // Assuming data is being added to Sheet1
+    valueInputOption: 'RAW', // Inserts values as they are
+    insertDataOption: 'INSERT_ROWS', // Ensures rows are inserted at the end
+    resource: {
+      values: [rowData], // The new row to append
+    },
   });
 
-  // Read the file content
-  let existingCsv = fs.readFileSync(tmpFile.name, 'utf-8').trim(); // Use trim to remove unnecessary whitespace
-
-  // Check if headers are already in the file
-  const hasHeaders = existingCsv.startsWith('url,all_pages,doc_link,text');
-
-  // Parse existing CSV and add new data
-  const fields = ['url', 'all_pages', 'doc_link', 'text'];
-
-  // Skip header if already present
-  let newCsv;
-  if (hasHeaders) {
-    // Parse without headers (use 'json2csv' and not 'Parser' in this case)
-    newCsv = parse([newData], { fields, header: false });
-  } else {
-    // Parse with headers (this happens only the first time)
-    const parser = new Parser({ fields });
-    newCsv = parser.parse([newData]);
-  }
-
-  // Ensure exactly one newline between existing content and new data
-  let updatedCsvContent = existingCsv;
-  
-  // Add a newline if the file does not end with one
-  if (!existingCsv.endsWith('\n')) {
-    updatedCsvContent += '\n';
-  }
-  
-  // Append new data
-  updatedCsvContent += newCsv;
-
-  // Re-upload the updated CSV content
-  const media = {
-    mimeType: 'text/csv',
-    body: updatedCsvContent,
-  };
-
-  await drive.files.update({
-    fileId: fileId,
-    media: media,
-  });
-
-  console.log(`Data appended to CSV file with ID: ${fileId}`);
+  console.log(`Data appended to Google Sheet: ${JSON.stringify(rowData)}`);
 }
 
 async function uploadCsvToDrive(folderId, fileName, data) {
