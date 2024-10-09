@@ -767,6 +767,25 @@ async function createEmptyCsvFile(folderId, fileName) {
   return spreadsheetId; // Return the Google Sheet ID for future use
 }
 
+function timeoutPromise(ms, promise) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Request timed out'));
+    }, ms);
+    
+    promise.then(
+      (res) => {
+        clearTimeout(timeoutId);
+        resolve(res);
+      },
+      (err) => {
+        clearTimeout(timeoutId);
+        reject(err);
+      }
+    );
+  });
+}
+
 async function appendDataToCsv(fileId, data, retries = 3) {
   const authClient = await auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: authClient });
@@ -775,16 +794,19 @@ async function appendDataToCsv(fileId, data, retries = 3) {
 
   for (let i = 0; i < retries; i++) {
     try {
-      await sheets.spreadsheets.values.append({
-        spreadsheetId: fileId,
-        range: 'Sheet1',
-        valueInputOption: 'RAW',
-        insertDataOption: 'INSERT_ROWS',
-        resource: {
-          values: [rowData],
-        },
-        timeout: 10000, // 10 seconds
-      });
+      await timeoutPromise(
+        10000, // 10 seconds
+        sheets.spreadsheets.values.append({
+          spreadsheetId: fileId,
+          range: 'Sheet1',
+          valueInputOption: 'RAW',
+          insertDataOption: 'INSERT_ROWS',
+          resource: {
+            values: [rowData],
+          },
+        })
+      );
+
       console.log(`Data appended to Google Sheet: ${JSON.stringify(rowData)}`);
       break; // Break the loop if the request succeeds
     } catch (error) {
