@@ -20,7 +20,7 @@ const { OpenAI } = require('openai');
 const { convert } = require('html-to-text');
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
-const { Parser } = require('json2csv');
+const { parse, Parser } = require('json2csv');
 const pLimit = require('p-limit');
 require('dotenv').config();
 const MAX_RECURSION_DEPTH = 5;
@@ -50,6 +50,15 @@ const credentials = {
   client_x509_cert_url: process.env.client_x509_cert_url,
   universe_domain: 'googleapis.com',
 };
+
+const auth = new google.auth.GoogleAuth({
+  credentials: credentials,
+  scopes: [
+    'https://www.googleapis.com/auth/documents',
+    'https://www.googleapis.com/auth/drive',
+  ],
+});
+
 
 async function getAllPages(url) {
   try {
@@ -107,10 +116,6 @@ async function retryWithBackoff(fn, retries = 50, delay = 10000) {
 
 async function createNewFolder(parentFolderId, folderName) {
   const createFolder = async () => {
-    const auth = new google.auth.GoogleAuth({
-      credentials: credentials,
-      scopes: ['https://www.googleapis.com/auth/drive'],
-    });
 
     const authClient = await auth.getClient();
     const drive = google.drive({ version: 'v3', auth: authClient });
@@ -140,10 +145,7 @@ async function createNewFolder(parentFolderId, folderName) {
 
 async function makeFolderPublic(folderId) {
   const makePublic = async () => {
-    const auth = new google.auth.GoogleAuth({
-      credentials: credentials,
-      scopes: ['https://www.googleapis.com/auth/drive'],
-    });
+
 
     const authClient = await auth.getClient();
     const drive = google.drive({ version: 'v3', auth: authClient });
@@ -169,13 +171,7 @@ async function makeFolderPublic(folderId) {
 async function createAndMoveDocument(content, url, parentFolderId) {
   console.log("testing?");
   const createDocument = async () => {
-    const auth = new google.auth.GoogleAuth({
-      credentials: credentials,
-      scopes: [
-        'https://www.googleapis.com/auth/documents',
-        'https://www.googleapis.com/auth/drive',
-      ],
-    });
+
 
     const authClient = await auth.getClient();
     const docs = google.docs({ version: 'v1', auth: authClient });
@@ -734,10 +730,7 @@ function sendCsvResponse(res, data) {
 }
 
 async function createEmptyCsvFile(folderId, fileName) {
-  const auth = new google.auth.GoogleAuth({
-    credentials: credentials,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
+
 
   const authClient = await auth.getClient();
   const drive = google.drive({ version: 'v3', auth: authClient });
@@ -768,11 +761,6 @@ async function createEmptyCsvFile(folderId, fileName) {
 }
 
 async function appendDataToCsv(fileId, newData) {
-  const auth = new google.auth.GoogleAuth({
-    credentials: credentials,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-
   const authClient = await auth.getClient();
   const drive = google.drive({ version: 'v3', auth: authClient });
 
@@ -795,12 +783,25 @@ async function appendDataToCsv(fileId, newData) {
   // Read the file content
   const existingCsv = fs.readFileSync(tmpFile.name, 'utf-8');
 
+  // Check if headers are already in the file
+  const hasHeaders = existingCsv.includes('url,all_pages,doc_link,text');
+
   // Parse existing CSV and add new data
   const fields = ['url', 'all_pages', 'doc_link', 'text'];
-  const parser = new Parser({ fields });
-  const newCsv = parser.parse([newData]);
 
-  const updatedCsvContent = existingCsv + '\n' + newCsv;
+  // Skip header if already present
+  let newCsv;
+  if (hasHeaders) {
+    // Parse without headers (use 'json2csv' and not 'Parser' in this case)
+    newCsv = parse([newData], { fields, header: false });
+  } else {
+    // Parse with headers (this happens only the first time)
+    const parser = new Parser({ fields });
+    newCsv = parser.parse([newData]);
+  }
+
+  // Append the new data to the existing content
+  const updatedCsvContent = `${existingCsv.trim()}\n${newCsv}`;
 
   // Re-upload the updated CSV content
   const media = {
@@ -818,10 +819,7 @@ async function appendDataToCsv(fileId, newData) {
 
 async function uploadCsvToDrive(folderId, fileName, data) {
   const uploadCsv = async () => {
-    const auth = new google.auth.GoogleAuth({
-      credentials: credentials,
-      scopes: ['https://www.googleapis.com/auth/drive'],
-    });
+
 
     const authClient = await auth.getClient();
     const drive = google.drive({ version: 'v3', auth: authClient });
