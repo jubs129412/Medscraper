@@ -779,7 +779,7 @@ async function appendDataToCsv(fileId, data, retries = 50, row_auth) {
   const authClient = await row_auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: authClient });
 
-  const rowData = data
+  const rowData = [data.url, data.all_pages, data.doc_link, data.text];
 
   for (let i = 0; i < retries; i++) {
     try {
