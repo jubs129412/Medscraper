@@ -781,11 +781,8 @@ async function appendDataToCsv(fileId, data, retries = 50, row_auth) {
 
   const rowData = [data.url, data.all_pages, data.doc_link, data.text];
 
-  for (let i = 0; i < retries; i++) {
     try {
-      await timeoutPromise(
-        60000, // 10 seconds
-        sheets.spreadsheets.values.append({
+sheets.spreadsheets.values.append({
           spreadsheetId: fileId,
           range: 'Sheet1',
           valueInputOption: 'RAW',
@@ -794,18 +791,19 @@ async function appendDataToCsv(fileId, data, retries = 50, row_auth) {
             values: [rowData],
           },
         })
-      );
 
       console.log(`Data appended to Google Sheet: ${JSON.stringify(rowData)}`);
-      break; // Break the loop if the request succeeds
     } catch (error) {
       if (i < retries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 10000));
+        retries += 1
         console.log(`Retrying request... (${i + 1}/${retries})`);
+        appendDataToCsv(fileId, data, retries = 50, row_auth)
       } else {
         console.error(`Failed to append data after ${retries} attempts:`, error);
       }
     }
-  }
+  
 }
 
 async function uploadCsvToDrive(folderId, fileName, data) {
