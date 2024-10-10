@@ -548,7 +548,7 @@ function writeHeapSnapshot() {
   });
 }
 async function processRowsInParallel(rows, parentFolderId, FileId) {
-  const limit = pLimit(25); // Limit concurrent promises
+  const limit = pLimit(15); // Limit concurrent promises
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
@@ -588,20 +588,20 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
               const docLink = await createAndMoveDocument(content, url, parentFolderId, row_auth);
 
               console.log(`${url} - all pages`);
-              appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '')} , 50, row_auth)
+              appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: docLink, text: content.replace(/#+/g, '')} , 50, row_auth)
               return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
             } else {
               console.log(`Content too short! Not adding ${url}`);
-              appendDataToCsv(FileId, { url: url, doc_link: null, text: null } , 3, row_auth)
+              appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: 'n/a', text: 'n/a'  } , 3, row_auth)
               return { ...row, doc_link: null, text: null };
             }
           } else if (all_pages === 'no') {
             const { content, docLink } = await scrapeLocal(url, parentFolderId);
-            appendDataToCsv(FileId, { url: url, doc_link: docLink, text: content.replace(/#+/g, '') }, 50, row_auth)
+            appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: docLink, text: content.replace(/#+/g, '') }, 50, row_auth)
             return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
           } else {
             console.log(`Invalid value for "all_pages" for URL: ${url}`);
-            appendDataToCsv(FileId, { url: url, doc_link: null, text: null }, 50, row_auth )
+            appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: 'n/a', text: 'n/a' }, 50, row_auth )
             return { ...row, doc_link: null, text: null };
           }
         }))
@@ -779,12 +779,12 @@ async function appendDataToCsv(fileId, data, retries = 50, row_auth) {
   const authClient = await row_auth.getClient();
   const sheets = google.sheets({ version: 'v4', auth: authClient });
 
-  const rowData = [data.url, data.all_pages || '', data.doc_link, data.text];
+  const rowData = data
 
   for (let i = 0; i < retries; i++) {
     try {
       await timeoutPromise(
-        30000, // 10 seconds
+        60000, // 10 seconds
         sheets.spreadsheets.values.append({
           spreadsheetId: fileId,
           range: 'Sheet1',
