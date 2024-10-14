@@ -592,7 +592,7 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
               return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
             } else {
               console.log(`Content too short! Not adding ${url}`);
-              //appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: 'n/a', text: 'n/a'  } , 3, row_auth)
+              appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: 'n/a', text: 'n/a'  } , 50, row_auth)
               return { ...row, doc_link: null, text: null };
             }
           } else if (all_pages === 'no') {
@@ -601,7 +601,7 @@ async function processRowsInParallel(rows, parentFolderId, FileId) {
             return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
           } else {
             console.log(`Invalid value for "all_pages" for URL: ${url}`);
-            //appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: 'n/a', text: 'n/a' }, 50, row_auth )
+            appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: 'n/a', text: 'n/a' }, 50, row_auth )
             return { ...row, doc_link: null, text: null };
           }
         }))
