@@ -413,9 +413,16 @@ async function scrapeLocal(url, parentFolderId, model) {
     const content = Array.from($("h1, h2, h3, h4, h5, h6, p")).map((x) => $(x).text()).join('\n');
     const generatedText = await generateText(url, content, model);
     console.log("generate complete after call!")
-
+    const row_auth = new google.auth.GoogleAuth({
+      credentials: credentials,
+      scopes: [
+        'https://www.googleapis.com/auth/documents',
+        'https://www.googleapis.com/auth/spreadsheets',
+        'https://www.googleapis.com/auth/drive',
+      ],
+    });
     // Create and move the document
-    const docLink = await createAndMoveDocument(generatedText, url, parentFolderId);
+    const docLink = await createAndMoveDocument(generatedText, url, parentFolderId, row_auth);
 
     // Clear the cheerio root
     $.root().empty();
