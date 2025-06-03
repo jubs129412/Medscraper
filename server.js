@@ -539,7 +539,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
     }
   } catch (error) {
     console.error('Error processing request:', error);
-    res.status(500).send('Internal Server Error');
+    res.status(200).send('Internal Server Error');
   }
 });
 function writeHeapSnapshot() {
@@ -598,7 +598,7 @@ async function processRowsInParallel(rows, parentFolderId, model, FileId) {
               const docLink = await createAndMoveDocument(content, url, parentFolderId, row_auth);
 
               console.log(`${url} - all pages`);
-              appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: docLink, text: content.replace(/#+/g, '')} , 50, row_auth)
+              appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: docLink, text: content ? content.replace(/#+/g, '') :  'n/a'} , 50, row_auth)
               return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
             } else {
               console.log(`Content too short! Not adding ${url}`);
@@ -607,8 +607,8 @@ async function processRowsInParallel(rows, parentFolderId, model, FileId) {
             }
           } else if (all_pages === 'no') {
             const { content, docLink } = await scrapeLocal(url, parentFolderId, model);
-            appendDataToCsv(FileId, { url: url, all_pages: "no", doc_link: docLink, text: content.replace(/#+/g, '') }, 50, row_auth)
-            return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
+            appendDataToCsv(FileId, { url: url, all_pages: "no", doc_link: docLink, text: content ? content.replace(/#+/g, '') : 'n/a' }, 50, row_auth)
+            return { ...row, doc_link: docLink, text: content ? content.replace(/#+/g, '') : null };
           } else {
             console.log(`Invalid value for "all_pages" for URL: ${url}`);
             appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: 'n/a', text: 'n/a' }, 50, row_auth )
