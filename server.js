@@ -376,14 +376,14 @@ const logMemoryUsage = () => {
   console.log(`Array Buffers: ${memoryUsage.arrayBuffers / 1024 / 1024} MB`);
 };
 
-async function generateText(url, text) {
+async function generateText(url, text, model) {
   console.log("begin generate!")
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const chatCompletion = await openai.chat.completions.create({
       messages: [{ role: 'assistant', content: prompt },{ role: 'user', content: `Website: ${url}` + text }],
-      model: process.env.GPT_MODEL,
+      model: model,
     });
     console.log("generate complete!")
     return chatCompletion.choices[0].message.content;
@@ -489,6 +489,8 @@ app.use(express.urlencoded({ extended: true }));
 app.post('/upload', upload.single('csv'), async (req, res) => {
   try {
     const results = [];
+    const model = req.body.model;
+    console.log('received for model: ', model)
     if (req.file) {
       const filePath = req.file.path;
       const fileName = req.file.originalname.split('.').slice(0, -1).join('.');
@@ -504,7 +506,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
           const newFolderId = await createNewFolder(parentFolderId, newFolderName);
           if (newFolderId) {
             await makeFolderPublic(newFolderId);
-            const processedResults = await processRowsInParallel(results, newFolderId);
+            const processedResults = await processRowsInParallel(results, newFolderId, model);
             console.log("postproc")
             await uploadCsvToDrive(newFolderId, fileName, processedResults);
           } else {
@@ -512,7 +514,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
           }
         });
     } else {
-      const { url, all_pages } = req.body;
+      const { url, all_pages, model } = req.body;
 
       if (!url || !all_pages) {
         return res.status(400).send('URL and all_pages fields are required.');
@@ -523,7 +525,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
       //const newFolderName = `${url}`;
       //const newFolderId = await createNewFolder(parentFolderId, newFolderName);
         //await makeFolderPublic(newFolderId);
-        const processedResults = await processRowsInParallel([{ url, all_pages }], parentFolderId);
+        const processedResults = await processRowsInParallel([{ url, all_pages, model }], parentFolderId);
         //await uploadCsvToDrive(parentFolderId, `output-${new Date().toISOString()}`, processedResults);
 
     }
@@ -547,7 +549,7 @@ function writeHeapSnapshot() {
     console.error('Error writing heap snapshot:', err);
   });
 }
-async function processRowsInParallel(rows, parentFolderId) {
+async function processRowsInParallel(rows, parentFolderId, model) {
  
   const limit = pLimit(15); 
 
@@ -578,7 +580,7 @@ async function processRowsInParallel(rows, parentFolderId) {
       if (pageTexts.join('\n').length > 100){
         pageTexts = pageTexts.join('\n')
         console.log("pre gentext")
-      var content = await generateText(url, pageTexts);
+      var content = await generateText(url, pageTexts, model);
       console.log("generate complete pre doclink!")
       logMemoryUsage();
       var docLink = await createAndMoveDocument(content, url, parentFolderId);
