@@ -12,6 +12,7 @@ const { fork } = require('child_process');
 const axios = require('axios').create({
   httpsAgent: new https.Agent({ rejectUnauthorized: false }),
 });
+const tmp = require('tmp');
 //const cheerio = require('cheerio');
 const cheerio = require('whacko');
 const multer = require('multer');
@@ -19,7 +20,7 @@ const { OpenAI } = require('openai');
 const { convert } = require('html-to-text');
 const jsdom = require("jsdom");
 const { JSDOM } = jsdom;
-const { Parser } = require('json2csv');
+const { parse, Parser } = require('json2csv');
 const pLimit = require('p-limit');
 require('dotenv').config();
 const MAX_RECURSION_DEPTH = 5;
@@ -49,6 +50,16 @@ const credentials = {
   client_x509_cert_url: process.env.client_x509_cert_url,
   universe_domain: 'googleapis.com',
 };
+
+const auth = new google.auth.GoogleAuth({
+  credentials: credentials,
+  scopes: [
+    'https://www.googleapis.com/auth/documents',
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive',
+  ],
+});
+
 
 async function getAllPages(url) {
   try {
@@ -90,11 +101,12 @@ function getBaseUrl(websiteUrl) {
   }
 }
 
-async function retryWithBackoff(fn, retries = 5, delay = 10000) {
+async function retryWithBackoff(fn, retries = 50, delay = 10000) {
   for (let i = 0; i < retries; i++) {
     try {
       return await fn();
     } catch (error) {
+      console.warn(error)
       if (i === retries - 1) throw error;
       const waitTime = delay * Math.pow(2, i);
       console.warn(`Retrying in ${waitTime / 1000} seconds...`);
@@ -105,10 +117,6 @@ async function retryWithBackoff(fn, retries = 5, delay = 10000) {
 
 async function createNewFolder(parentFolderId, folderName) {
   const createFolder = async () => {
-    const auth = new google.auth.GoogleAuth({
-      credentials: credentials,
-      scopes: ['https://www.googleapis.com/auth/drive'],
-    });
 
     const authClient = await auth.getClient();
     const drive = google.drive({ version: 'v3', auth: authClient });
@@ -138,10 +146,7 @@ async function createNewFolder(parentFolderId, folderName) {
 
 async function makeFolderPublic(folderId) {
   const makePublic = async () => {
-    const auth = new google.auth.GoogleAuth({
-      credentials: credentials,
-      scopes: ['https://www.googleapis.com/auth/drive'],
-    });
+
 
     const authClient = await auth.getClient();
     const drive = google.drive({ version: 'v3', auth: authClient });
@@ -164,18 +169,12 @@ async function makeFolderPublic(folderId) {
   }
 }
 
-async function createAndMoveDocument(content, url, parentFolderId) {
+async function createAndMoveDocument(content, url, parentFolderId, row_auth) {
   console.log("testing?");
   const createDocument = async () => {
-    const auth = new google.auth.GoogleAuth({
-      credentials: credentials,
-      scopes: [
-        'https://www.googleapis.com/auth/documents',
-        'https://www.googleapis.com/auth/drive',
-      ],
-    });
 
-    const authClient = await auth.getClient();
+
+    const authClient = await row_auth.getClient();
     const docs = google.docs({ version: 'v1', auth: authClient });
     const drive = google.drive({ version: 'v3', auth: authClient });
 
@@ -361,7 +360,7 @@ async function createAndMoveDocument(content, url, parentFolderId) {
   try {
     return await retryWithBackoff(createDocument);
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error with doc:', error.message);
     return null;
   }
 }
@@ -488,9 +487,8 @@ app.use(express.urlencoded({ extended: true }));
 
 app.post('/upload', upload.single('csv'), async (req, res) => {
   try {
-    const results = [];
     const model = req.body.model;
-    console.log('received for model: ', model)
+    const results = [];
     if (req.file) {
       const filePath = req.file.path;
       const fileName = req.file.originalname.split('.').slice(0, -1).join('.');
@@ -504,6 +502,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
           const parentFolderId = process.env.G_DRIVE_FOLDER;
           const newFolderName = fileName;
           const newFolderId = await createNewFolder(parentFolderId, newFolderName);
+          const FileId = await createEmptyCsvFile(newFolderId, fileName)
           if (newFolderId) {
             await makeFolderPublic(newFolderId);
             const processedResults = await processRowsInParallel(results, newFolderId, model, FileId);
@@ -525,7 +524,6 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
       //const newFolderName = `${url}`;
       //const newFolderId = await createNewFolder(parentFolderId, newFolderName);
         //await makeFolderPublic(newFolderId);
-        console.log("model should be here: " , model)
         const processedResults = await processRowsInParallel([{ url, all_pages }], parentFolderId, model);
         //await uploadCsvToDrive(parentFolderId, `output-${new Date().toISOString()}`, processedResults);
 
@@ -551,60 +549,67 @@ function writeHeapSnapshot() {
   });
 }
 async function processRowsInParallel(rows, parentFolderId, model, FileId) {
- console.log('processing with model: ', model)
-  const limit = pLimit(15); 
+  const limit = pLimit(15); // Limit concurrent promises
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
-console.log("row: ", model)
-    if (all_pages === 'yes') {
-      let pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
-      if (pages.length === 0) {
-        pages = [url];
-      }
+
+      // Wrap the main task in a race with the timeout
+          if (all_pages === 'yes') {
+            let pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
+            if (pages.length === 0) {
+              pages = [url];
+            }
+
+            let pageTexts = [];
+            for (const [index, page] of pages.entries()) {
+              console.log(`Running getPageText for index: ${index}`);
+              try {
+                const text = await getPageText(page);
+                pageTexts.push(text);
+              } catch (error) {
+                console.error(`Failed to get text for ${page} at index ${index}`, error);
+              }
+            }
+            logMemoryUsage();
+            const row_auth = new google.auth.GoogleAuth({
+              credentials: credentials,
+              scopes: [
+                'https://www.googleapis.com/auth/documents',
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive',
+              ],
+            });
+            if (pageTexts.join('\n').length > 100) {
+              pageTexts = pageTexts.join('\n');
+              console.log("Pre gentext");
+              const content = await generateText(url, pageTexts, model);
+              console.log("Generate complete pre doclink!");
+              logMemoryUsage();
+              const docLink = await createAndMoveDocument(content, url, parentFolderId, row_auth);
+
+              console.log(`${url} - all pages`);
+              appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: docLink, text: content.replace(/#+/g, '')} , 50, row_auth)
+              return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
+            } else {
+              console.log(`Content too short! Not adding ${url}`);
+              appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: 'n/a', text: 'n/a'  } , 50, row_auth)
+              return { ...row, doc_link: null, text: null };
+            }
+          } else if (all_pages === 'no') {
+            const { content, docLink } = await scrapeLocal(url, parentFolderId, model);
+            appendDataToCsv(FileId, { url: url, all_pages: "no", doc_link: docLink, text: content.replace(/#+/g, '') }, 50, row_auth)
+            return { ...row, doc_link: docLink, text: content.replace(/#+/g, '') };
+          } else {
+            console.log(`Invalid value for "all_pages" for URL: ${url}`);
+            appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: 'n/a', text: 'n/a' }, 50, row_auth )
+            return { ...row, doc_link: null, text: null };
+          }
+        }))
       
-      let pageTexts = [];
-
-      for (const [index, page] of pages.entries()) {
-        console.log(`Running getPageText for index: ${index}`);
-        try {
-          const text = await getPageText(page);
-          //console.log(text);
-          pageTexts.push(text);
-        } catch (error) {
-          console.error(`Failed to get text for ${page} at index ${index}`, error);
-        }
+        return Promise.all(promises);
       }
-      logMemoryUsage();
-
-      console.log("joining")
-      if (pageTexts.join('\n').length > 100){
-        pageTexts = pageTexts.join('\n')
-        console.log("pre gentext")
-      var content = await generateText(url, pageTexts, model);
-      console.log("generate complete pre doclink!")
-      logMemoryUsage();
-      var docLink = await createAndMoveDocument(content, url, parentFolderId);
-      
-    }
-    else {
-      console.log(pageTexts.join('\n'))
-      console.log(`content too short! not adding ${url}`)
-      return { ...row, doc_link: null };
-    }
-      console.log(`${url} - all pages`);
-      return { ...row, doc_link: docLink };
-    } else if (all_pages === 'no') {
-      const { content, docLink } = await scrapeLocal(url, parentFolderId, model);
-      return { ...row, doc_link: docLink };
-    } else {
-      console.log(`Invalid value for "all_pages" for URL: ${url}`);
-      return { ...row, doc_link: null };
-    }
-  }));
-
-  return Promise.all(promises);
-}
+    
 
 function logHeapSnapshot() {
   const snapshotStream = v8.getHeapSnapshot();
@@ -715,12 +720,97 @@ function sendCsvResponse(res, data) {
   res.send(csv);
 }
 
+async function createEmptyCsvFile(folderId, fileName) {
+  const authClient = await auth.getClient();
+  const drive = google.drive({ version: 'v3', auth: authClient });
+  const sheets = google.sheets({ version: 'v4', auth: authClient });
+
+  // Step 1: Create a blank Google Sheet in the specified folder
+  const fileMetadata = {
+    name: fileName,
+    mimeType: 'application/vnd.google-apps.spreadsheet',
+    parents: [folderId],
+  };
+
+  const file = await drive.files.create({
+    resource: fileMetadata,
+    fields: 'id',
+  });
+
+  const spreadsheetId = file.data.id;
+  console.log(`Empty Google Sheet created with ID: ${spreadsheetId}`);
+
+  // Step 2: Add headers to the first row of the Google Sheet
+  const headers = ['url', 'all_pages', 'doc_link', 'text'];
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId,
+    range: 'Sheet1!A1', // Starting from the first cell
+    valueInputOption: 'RAW',
+    resource: {
+      values: [headers],
+    },
+  });
+
+  console.log(`Headers added to the Google Sheet: ${headers.join(', ')}`);
+
+  return spreadsheetId; // Return the Google Sheet ID for future use
+}
+
+function timeoutPromise(ms, promise) {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Request timed out'));
+    }, ms);
+    
+    promise.then(
+      (res) => {
+        clearTimeout(timeoutId);
+        resolve(res);
+      },
+      (err) => {
+        clearTimeout(timeoutId);
+        reject(err);
+      }
+    );
+  });
+}
+
+async function appendDataToCsv(fileId, data, retries = 50, row_auth) {
+  const authClient = await row_auth.getClient();
+  const sheets = google.sheets({ version: 'v4', auth: authClient });
+
+  const rowData = [data.url, data.all_pages, data.doc_link, data.text];
+
+  for (let i = 0; i < retries; i++) {
+    try {
+      await sheets.spreadsheets.values.append({
+        spreadsheetId: fileId,
+        range: 'Sheet1',
+        valueInputOption: 'RAW',
+        insertDataOption: 'INSERT_ROWS',
+        resource: {
+          values: [rowData],
+        },
+      });
+
+      console.log(`Data appended to Google Sheet: ${JSON.stringify(rowData)}`);
+      return; // Exit function if successful
+    } catch (error) {
+      if (i < retries - 1) {
+        console.log(`Retrying request... (${i + 1}/${retries})`);
+        await new Promise((resolve) => setTimeout(resolve, 10000)); // Wait before retrying
+      } else {
+        console.error(`Failed to append data after ${retries} attempts:`, error);
+        return; // Exit function after final attempt
+      }
+    }
+  }
+}
+
 async function uploadCsvToDrive(folderId, fileName, data) {
   const uploadCsv = async () => {
-    const auth = new google.auth.GoogleAuth({
-      credentials: credentials,
-      scopes: ['https://www.googleapis.com/auth/drive'],
-    });
+
 
     const authClient = await auth.getClient();
     const drive = google.drive({ version: 'v3', auth: authClient });
