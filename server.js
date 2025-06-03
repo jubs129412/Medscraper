@@ -526,7 +526,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
       //const newFolderId = await createNewFolder(parentFolderId, newFolderName);
         //await makeFolderPublic(newFolderId);
         console.log("model should be here: " , model)
-        const processedResults = await processRowsInParallel([{ url, all_pages, model }], parentFolderId);
+        const processedResults = await processRowsInParallel([{ url, all_pages }], parentFolderId, model);
         //await uploadCsvToDrive(parentFolderId, `output-${new Date().toISOString()}`, processedResults);
 
     }
@@ -550,7 +550,7 @@ function writeHeapSnapshot() {
     console.error('Error writing heap snapshot:', err);
   });
 }
-async function processRowsInParallel(rows, parentFolderId, model,FileId) {
+async function processRowsInParallel(rows, parentFolderId, model, FileId) {
  console.log('processing with model: ', model)
   const limit = pLimit(15); 
 
