@@ -524,7 +524,9 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
       //const newFolderName = `${url}`;
       //const newFolderId = await createNewFolder(parentFolderId, newFolderName);
         //await makeFolderPublic(newFolderId);
-        const processedResults = await processRowsInParallel([{ url, all_pages }], parentFolderId, model);
+        const fileName = generateRandomId() + '.csv';
+        const FileId = await createEmptyCsvFile(parentFolderId, fileName)
+        const processedResults = await processRowsInParallel([{ url, all_pages }], parentFolderId, model, FileId);
         //await uploadCsvToDrive(parentFolderId, `output-${new Date().toISOString()}`, processedResults);
 
     }
@@ -798,6 +800,7 @@ async function appendDataToCsv(fileId, data, retries = 50, row_auth) {
       return; // Exit function if successful
     } catch (error) {
       if (i < retries - 1) {
+        console.log(error)
         console.log(`Retrying request... (${i + 1}/${retries})`);
         await new Promise((resolve) => setTimeout(resolve, 10000)); // Wait before retrying
       } else {
@@ -843,4 +846,13 @@ async function uploadCsvToDrive(folderId, fileName, data) {
   } catch (error) {
     console.error('Error uploading CSV file:', error);
   }
+}
+
+function generateRandomId(length = 12) {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
