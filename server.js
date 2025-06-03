@@ -550,7 +550,7 @@ function writeHeapSnapshot() {
     console.error('Error writing heap snapshot:', err);
   });
 }
-async function processRowsInParallel(rows, parentFolderId, FileId, model) {
+async function processRowsInParallel(rows, parentFolderId, model) {
  console.log('processing with model: ', model)
   const limit = pLimit(15); 
 
