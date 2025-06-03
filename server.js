@@ -514,7 +514,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
           }
         });
     } else {
-      const { url, all_pages, model } = req.body;
+      const { url, all_pages } = req.body;
 
       if (!url || !all_pages) {
         return res.status(400).send('URL and all_pages fields are required.');
@@ -525,6 +525,7 @@ app.post('/upload', upload.single('csv'), async (req, res) => {
       //const newFolderName = `${url}`;
       //const newFolderId = await createNewFolder(parentFolderId, newFolderName);
         //await makeFolderPublic(newFolderId);
+        console.log("model should be here: " , model)
         const processedResults = await processRowsInParallel([{ url, all_pages, model }], parentFolderId);
         //await uploadCsvToDrive(parentFolderId, `output-${new Date().toISOString()}`, processedResults);
 
