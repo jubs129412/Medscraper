@@ -550,12 +550,12 @@ function writeHeapSnapshot() {
   });
 }
 async function processRowsInParallel(rows, parentFolderId, FileId, model) {
- 
+ console.log('processing with model: ', model)
   const limit = pLimit(15); 
 
   const promises = rows.map((row) => limit(async () => {
     const { url, all_pages } = row;
-
+console.log("row: ", model)
     if (all_pages === 'yes') {
       let pages = await getUrlsFromSitemap(`${getBaseUrl(url)}/sitemap.xml`);
       if (pages.length === 0) {
