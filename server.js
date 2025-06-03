@@ -393,7 +393,7 @@ async function generateText(url, text, model) {
   }
 }
 
-async function scrapeLocal(url, parentFolderId) {
+async function scrapeLocal(url, parentFolderId, model) {
   let response = null;
   let $ = null;
   let cleanedText = null;
@@ -412,7 +412,7 @@ async function scrapeLocal(url, parentFolderId) {
 
     // Extract specific content using cheerio selectors
     const content = Array.from($("h1, h2, h3, h4, h5, h6, p")).map((x) => $(x).text()).join('\n');
-    const generatedText = await generateText(url, content);
+    const generatedText = await generateText(url, content, model);
     console.log("generate complete after call!")
 
     // Create and move the document
@@ -594,7 +594,7 @@ async function processRowsInParallel(rows, parentFolderId, FileId, model) {
       console.log(`${url} - all pages`);
       return { ...row, doc_link: docLink };
     } else if (all_pages === 'no') {
-      const { content, docLink } = await scrapeLocal(url, parentFolderId);
+      const { content, docLink } = await scrapeLocal(url, parentFolderId, model);
       return { ...row, doc_link: docLink };
     } else {
       console.log(`Invalid value for "all_pages" for URL: ${url}`);
