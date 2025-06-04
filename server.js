@@ -606,10 +606,26 @@ async function processRowsInParallel(rows, parentFolderId, model, FileId) {
               return { ...row, doc_link: null, text: null };
             }
           } else if (all_pages === 'no') {
+            const row_auth = new google.auth.GoogleAuth({
+              credentials: credentials,
+              scopes: [
+                'https://www.googleapis.com/auth/documents',
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive',
+              ],
+            });
             const { content, docLink } = await scrapeLocal(url, parentFolderId, model);
             appendDataToCsv(FileId, { url: url, all_pages: "no", doc_link: docLink, text: content ? content.replace(/#+/g, '') : 'n/a' }, 50, row_auth)
             return { ...row, doc_link: docLink, text: content ? content.replace(/#+/g, '') : null };
           } else {
+            const row_auth = new google.auth.GoogleAuth({
+              credentials: credentials,
+              scopes: [
+                'https://www.googleapis.com/auth/documents',
+                'https://www.googleapis.com/auth/spreadsheets',
+                'https://www.googleapis.com/auth/drive',
+              ],
+            });
             console.log(`Invalid value for "all_pages" for URL: ${url}`);
             appendDataToCsv(FileId, { url: url, all_pages: "yes", doc_link: 'n/a', text: 'n/a' }, 50, row_auth )
             return { ...row, doc_link: null, text: null };
