@@ -427,7 +427,7 @@ async function scrapeLocal(url, parentFolderId, model) {
     // Clear the cheerio root
     $.root().empty();
 
-    //return { content: generatedText, docLink };
+    return { content: generatedText, docLink };
     return ''
   } catch (error) {
     console.log(error);
@@ -436,8 +436,8 @@ async function scrapeLocal(url, parentFolderId, model) {
       $.root().empty();
     }
 
-    //return { content: '', docLink: null };
-    return ''
+    return { content: 'error', docLink: docLink };
+    //return ''
 
   } finally {
     // Clear references to potentially large objects
